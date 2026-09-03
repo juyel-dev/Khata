@@ -34,13 +34,8 @@ function generateId(): string {
 
 export async function getNotebooks(includeArchived = false): Promise<NotebookWithStats[]> {
   try {
-    let collection = db.notebooks.toCollection();
-    if (!includeArchived) {
-      collection = db.notebooks.where('archived').equals(0 as any); // dexie boolean index
-    }
-    const notebooks = await collection.toArray();
-    // Filter manually just in case boolean index behaves differently across browsers
-    const filtered = includeArchived ? notebooks : notebooks.filter((n) => !n.archived);
+    const allNotebooks = await db.notebooks.toArray();
+    const filtered = includeArchived ? allNotebooks : allNotebooks.filter((n) => !n.archived);
 
     // Compute stats for each
     const result: NotebookWithStats[] = [];
@@ -59,6 +54,107 @@ export async function getNotebooks(includeArchived = false): Promise<NotebookWit
   } catch (err) {
     console.error('Error in getNotebooks:', err);
     return [];
+  }
+}
+
+export async function ensureDefaultNotebook(): Promise<NotebookWithStats> {
+  const existing = await getNotebooks(false);
+  if (existing.length > 0) {
+    return existing[0];
+  }
+  const defaultNb = await createNotebook({
+    name: 'সাধারণ খাতা',
+    openingBalance: 0,
+    color: '#2F6B4F',
+    icon: 'book',
+  });
+  return {
+    ...defaultNb,
+    currentBalance: 0,
+    peopleCount: 0,
+    transactionCount: 0,
+  };
+}
+
+export async function getOverallSummary(): Promise<{
+  totalToReceive: number;
+  totalToPay: number;
+  todayGot: number;
+  todayGave: number;
+  totalCash: number;
+  totalCustomers: number;
+}> {
+  try {
+    const allPeople = await db.people.toArray();
+    const allTxs = await db.transactions.toArray();
+    const allNotebooks = await db.notebooks.toArray();
+
+    const personMap = new Map<string, { given: number; taken: number }>();
+    allPeople.forEach((p) => personMap.set(p.id, { given: 0, taken: 0 }));
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const todayEpoch = startOfToday.getTime();
+
+    let todayGot = 0;
+    let todayGave = 0;
+    let allGot = 0;
+    let allGave = 0;
+
+    for (const tx of allTxs) {
+      if (tx.type === 'got') {
+        allGot += tx.amount;
+        if (tx.occurredAt >= todayEpoch) todayGot += tx.amount;
+      } else {
+        allGave += tx.amount;
+        if (tx.occurredAt >= todayEpoch) todayGave += tx.amount;
+      }
+
+      const pEntry = personMap.get(tx.personId);
+      if (pEntry) {
+        if (tx.type === 'gave') {
+          pEntry.given += tx.amount;
+        } else {
+          pEntry.taken += tx.amount;
+        }
+      }
+    }
+
+    let totalToReceive = 0;
+    let totalToPay = 0;
+
+    personMap.forEach((entry) => {
+      const net = entry.given - entry.taken;
+      if (net > 0) {
+        totalToReceive += net;
+      } else if (net < 0) {
+        totalToPay += Math.abs(net);
+      }
+    });
+
+    let totalOpening = 0;
+    allNotebooks.forEach((nb) => {
+      if (!nb.archived) totalOpening += nb.openingBalance;
+    });
+
+    return {
+      totalToReceive,
+      totalToPay,
+      todayGot,
+      todayGave,
+      totalCash: totalOpening + allGot - allGave,
+      totalCustomers: allPeople.length,
+    };
+  } catch (err) {
+    console.error('Error computing overall summary:', err);
+    return {
+      totalToReceive: 0,
+      totalToPay: 0,
+      todayGot: 0,
+      todayGave: 0,
+      totalCash: 0,
+      totalCustomers: 0,
+    };
   }
 }
 
@@ -204,6 +300,56 @@ export async function getPeopleWithBalances(notebookId: string): Promise<PersonW
   });
 }
 
+export async function getAllPeopleWithBalances(): Promise<
+  (PersonWithBalance & { notebookName?: string; notebookColor?: string })[]
+> {
+  try {
+    const activeNotebooks = await getNotebooks(false);
+    const activeNbIds = new Set(activeNotebooks.map((n) => n.id));
+    const allPeople = await db.people.toArray();
+    const relevantPeople = allPeople.filter((p) => activeNbIds.has(p.notebookId));
+    const allTxs = await db.transactions.toArray();
+
+    const nbMap = new Map<string, { name: string; color: string }>();
+    activeNotebooks.forEach((n) => nbMap.set(n.id, { name: n.name, color: n.color }));
+
+    const result = relevantPeople.map((person) => {
+      const personTxs = allTxs.filter((t) => t.personId === person.id);
+      let totalGiven = 0;
+      let totalTaken = 0;
+
+      personTxs.sort((a, b) => b.occurredAt - a.occurredAt);
+
+      for (const t of personTxs) {
+        if (t.type === 'gave') totalGiven += t.amount;
+        else totalTaken += t.amount;
+      }
+
+      const nbInfo = nbMap.get(person.notebookId);
+
+      return {
+        ...person,
+        notebookName: nbInfo?.name || '',
+        notebookColor: nbInfo?.color || '#2F6B4F',
+        totalGiven,
+        totalTaken,
+        net: totalGiven - totalTaken,
+        lastTransaction: personTxs[0],
+        transactionCount: personTxs.length,
+      };
+    });
+
+    return result.sort((a, b) => {
+      const aTime = a.lastTransaction?.occurredAt || a.createdAt;
+      const bTime = b.lastTransaction?.occurredAt || b.createdAt;
+      return bTime - aTime;
+    });
+  } catch (err) {
+    console.error('Error in getAllPeopleWithBalances:', err);
+    return [];
+  }
+}
+
 export async function getPersonWithBalance(personId: string): Promise<PersonWithBalance | null> {
   const person = await db.people.get(personId);
   if (!person) return null;
@@ -232,8 +378,13 @@ export async function getPersonWithBalance(personId: string): Promise<PersonWith
   };
 }
 
-export async function getOrCreatePerson(notebookId: string, name: string): Promise<Person> {
+export async function getOrCreatePerson(
+  notebookId: string,
+  name: string,
+  phone?: string
+): Promise<Person> {
   const cleanName = name.trim();
+  const cleanPhone = phone?.trim() || undefined;
   const existing = await db.people
     .where('notebookId')
     .equals(notebookId)
@@ -241,6 +392,11 @@ export async function getOrCreatePerson(notebookId: string, name: string): Promi
     .first();
 
   if (existing) {
+    if (cleanPhone && !existing.phone) {
+      await db.people.update(existing.id, { phone: cleanPhone });
+      existing.phone = cleanPhone;
+      notifyChange();
+    }
     return existing;
   }
 
@@ -248,6 +404,7 @@ export async function getOrCreatePerson(notebookId: string, name: string): Promi
     id: generateId(),
     notebookId,
     name: cleanName,
+    phone: cleanPhone,
     createdAt: Date.now(),
   };
 
@@ -256,8 +413,11 @@ export async function getOrCreatePerson(notebookId: string, name: string): Promi
   return newPerson;
 }
 
-export async function updatePerson(id: string, name: string): Promise<void> {
-  await db.people.update(id, { name: name.trim() });
+export async function updatePerson(id: string, name: string, phone?: string): Promise<void> {
+  await db.people.update(id, {
+    name: name.trim(),
+    ...(phone !== undefined ? { phone: phone.trim() || undefined } : {}),
+  });
   notifyChange();
 }
 

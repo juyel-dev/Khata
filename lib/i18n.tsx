@@ -144,6 +144,31 @@ export const translations = {
     offlineMode: 'Offline Mode (Saved to phone)',
     onlineBack: 'Back Online (Synced to Cloud)',
     autoSyncSuccess: 'Data automatically synced to cloud',
+
+    // Dashboard & Ledger
+    totalToReceive: 'Total to receive',
+    totalToPay: 'Total to pay',
+    todayGot: 'Today In',
+    todayGave: 'Today Out',
+    netCash: 'Net Cash',
+    customers: 'Customers',
+    transactions: 'Transactions',
+    notebooks: 'Books',
+    phone: 'Phone',
+    phonePlaceholder: 'Mobile number (optional)',
+    sendReminder: 'Send Reminder',
+    sendWhatsApp: 'WhatsApp Reminder',
+    sendSMS: 'Share / SMS',
+    printStatement: 'Print Statement',
+    currency: 'Currency',
+    addCustomer: 'Add Customer',
+    searchCustomer: 'Search customer by name or phone...',
+    allCustomers: 'All',
+    owesFilter: 'Owes you',
+    youOweFilter: 'You owe',
+    recentTransactions: 'Recent Transactions',
+    noCustomersFound: 'No customers found',
+    noCustomersYet: 'No customers recorded yet — record your first transaction below',
     
     // About & Help
     aboutTitle: 'About Khata',
@@ -300,6 +325,31 @@ export const translations = {
     offlineMode: 'অফলাইন মোড (ফোনে সেভ হচ্ছে)',
     onlineBack: 'ইন্টারনেট চালু (ক্লাউডে সিঙ্ক সম্পন্ন)',
     autoSyncSuccess: 'ক্লাউডে অটো-সিঙ্ক সফল হয়েছে',
+
+    // Dashboard & Ledger
+    totalToReceive: 'মোট পাবো',
+    totalToPay: 'মোট দেবো',
+    todayGot: 'আজকের জমা',
+    todayGave: 'আজকের খরচ',
+    netCash: 'হাতে নগদ',
+    customers: 'কাস্টমার',
+    transactions: 'লেনদেন',
+    notebooks: 'খাতা সমূহ',
+    phone: 'মোবাইল',
+    phonePlaceholder: 'মোবাইল নম্বর (ঐচ্ছিক)',
+    sendReminder: 'তাগাদা পাঠান',
+    sendWhatsApp: 'হোয়াটসঅ্যাপ তাগাদা',
+    sendSMS: 'শেয়ার / এসএমএস',
+    printStatement: 'রসিদ প্রিন্ট করুন',
+    currency: 'মুদ্রা',
+    addCustomer: 'নতুন কাস্টমার',
+    searchCustomer: 'নাম বা মোবাইল নম্বর দিয়ে খুঁজুন...',
+    allCustomers: 'সকল',
+    owesFilter: 'পাবো',
+    youOweFilter: 'দেবো',
+    recentTransactions: 'সাম্প্রতিক লেনদেন',
+    noCustomersFound: 'কোনো কাস্টমার পাওয়া যায়নি',
+    noCustomersYet: 'এখনো কোনো কাস্টমার যোগ করা হয়নি — নিচে দিলাম বা পেলাম চাপুন',
     
     // About & Help
     aboutTitle: 'খাতা পরিচিতি',
@@ -337,7 +387,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         return savedLang;
       }
     }
-    return 'en';
+    return 'bn';
   });
 
   const setLang = (newLang: Language) => {

@@ -1,8 +1,25 @@
 /**
  * Money utilities for Khata
- * All monetary values are stored in integer paise (₹1 = 100 paise) to eliminate floating point issues.
- * Indian numbering format (e.g. ₹1,23,456) is used.
+ * All monetary values are stored in integer paisa/poisha (1 unit = 100 poisha/paise) to eliminate floating point issues.
+ * Supports Taka (৳), Rupee (₹), Dollar ($). Default is Taka (৳).
  */
+
+export type CurrencySymbol = '৳' | '₹' | '$';
+
+export function getCurrencySymbol(): CurrencySymbol {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('khata_currency') as CurrencySymbol;
+    if (saved && (saved === '৳' || saved === '₹' || saved === '$')) return saved;
+  }
+  return '৳';
+}
+
+export function setCurrencySymbol(symbol: CurrencySymbol): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('khata_currency', symbol);
+    window.dispatchEvent(new Event('currencychange'));
+  }
+}
 
 export function paiseToRupees(paise: number): number {
   return paise / 100;
@@ -15,14 +32,17 @@ export function rupeesToPaise(rupees: number | string): number {
 }
 
 /**
- * Formats paise into Indian Rupee format with ₹ symbol.
- * If includeSymbol is true: "₹1,500" or "₹1,500.50"
+ * Formats paise/poisha into clean localized format with currency symbol.
+ * Example: "৳ ১,৫০০" or "৳ 1,500.50"
  */
-export function formatPaise(paise: number, options: { includeSymbol?: boolean; showSign?: boolean } = {}): string {
-  const { includeSymbol = true, showSign = false } = options;
+export function formatPaise(
+  paise: number,
+  options: { includeSymbol?: boolean; showSign?: boolean; currency?: string } = {}
+): string {
+  const { includeSymbol = true, showSign = false, currency } = options;
   const isNegative = paise < 0;
   const absPaise = Math.abs(paise);
-  const rupees = absPaise / 100;
+  const amount = absPaise / 100;
 
   // Check if fractional part exists
   const hasFraction = absPaise % 100 !== 0;
@@ -30,11 +50,13 @@ export function formatPaise(paise: number, options: { includeSymbol?: boolean; s
   const formattedNumber = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: hasFraction ? 2 : 0,
     maximumFractionDigits: 2,
-  }).format(rupees);
+  }).format(amount);
 
+  const sym = currency || getCurrencySymbol();
   let result = formattedNumber;
+
   if (includeSymbol) {
-    result = `₹${result}`;
+    result = `${sym} ${result}`;
   }
 
   if (isNegative) {
@@ -49,7 +71,7 @@ export function formatPaise(paise: number, options: { includeSymbol?: boolean; s
 /**
  * Format relative date/time cleanly
  */
-export function formatDateTime(epochMs: number, lang: 'en' | 'bn' = 'en'): string {
+export function formatDateTime(epochMs: number, lang: 'en' | 'bn' = 'bn'): string {
   const date = new Date(epochMs);
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
@@ -58,7 +80,7 @@ export function formatDateTime(epochMs: number, lang: 'en' | 'bn' = 'en'): strin
   yesterday.setDate(yesterday.getDate() - 1);
   const isYesterday = date.toDateString() === yesterday.toDateString();
 
-  const timeStr = date.toLocaleTimeString(lang === 'bn' ? 'bn-IN' : 'en-IN', {
+  const timeStr = date.toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en-IN', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -71,7 +93,7 @@ export function formatDateTime(epochMs: number, lang: 'en' | 'bn' = 'en'): strin
     return lang === 'bn' ? `গতকাল, ${timeStr}` : `Yesterday, ${timeStr}`;
   }
 
-  const dateStr = date.toLocaleDateString(lang === 'bn' ? 'bn-IN' : 'en-IN', {
+  const dateStr = date.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-IN', {
     day: 'numeric',
     month: 'short',
     year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
@@ -80,7 +102,7 @@ export function formatDateTime(epochMs: number, lang: 'en' | 'bn' = 'en'): strin
   return `${dateStr}, ${timeStr}`;
 }
 
-export function formatDateHeading(epochMs: number, lang: 'en' | 'bn' = 'en'): string {
+export function formatDateHeading(epochMs: number, lang: 'en' | 'bn' = 'bn'): string {
   const date = new Date(epochMs);
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
@@ -96,10 +118,9 @@ export function formatDateHeading(epochMs: number, lang: 'en' | 'bn' = 'en'): st
     return lang === 'bn' ? 'গতকাল' : 'Yesterday';
   }
 
-  return date.toLocaleDateString(lang === 'bn' ? 'bn-IN' : 'en-IN', {
+  return date.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-IN', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
-    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
   });
 }

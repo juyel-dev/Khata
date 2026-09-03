@@ -10,8 +10,10 @@ import {
   getNotebooks,
   getNotebook,
   getPeopleWithBalances,
+  getAllPeopleWithBalances,
   getPersonWithBalance,
   getTransactions,
+  ensureDefaultNotebook,
   subscribeToDatabase,
 } from '@/lib/db/operations';
 
@@ -22,18 +24,22 @@ export function useNotebooks(includeArchived = false) {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchNotebooks = () => {
-      getNotebooks(includeArchived)
-        .then((data) => {
-          if (isMounted) {
-            setNotebooks(data);
-            setLoading(false);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to load notebooks:', err);
-          if (isMounted) setLoading(false);
-        });
+    const fetchNotebooks = async () => {
+      try {
+        let data = await getNotebooks(includeArchived);
+        if (data.length === 0 && !includeArchived) {
+          // Automatically ensure the primary ledger notebook is initialized
+          const defNb = await ensureDefaultNotebook();
+          data = [defNb];
+        }
+        if (isMounted) {
+          setNotebooks(data);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to load notebooks:', err);
+        if (isMounted) setLoading(false);
+      }
     };
 
     fetchNotebooks();
@@ -46,6 +52,40 @@ export function useNotebooks(includeArchived = false) {
   }, [includeArchived]);
 
   return { notebooks, loading };
+}
+
+export function useAllPeople() {
+  const [people, setPeople] = useState<
+    (PersonWithBalance & { notebookName?: string; notebookColor?: string })[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAllPeople = async () => {
+      try {
+        const data = await getAllPeopleWithBalances();
+        if (isMounted) {
+          setPeople(data);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to load all people:', err);
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchAllPeople();
+    const unsubscribe = subscribeToDatabase(fetchAllPeople);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  return { people, loading };
 }
 
 export function useNotebook(id: string | null) {
