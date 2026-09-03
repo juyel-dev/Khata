@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --paper: #FBF7EF;
+    --paper-card: #FFFFFF;
+    --ink: #241F16;
+    --ink-dim: #6B6455;
+    --rule: #E4DCC8;
+    --accent: #2F6B4F;
+    --accent-soft: #E4EFE7;
+    --accent-hover: #265740;
+    --owe-you: #B4491F;
+    --owe-you-soft: #F6E4DA;
+    --you-owe: #2F6B4F;
+    --you-owe-soft: #E4EFE7;
+    --neutral-settled: #6B6455;
+    --danger: #A13A2E;
+  }
+
+  .dark {
+    --paper: #14140F;
+    --paper-card: #1C1B16;
+    --ink: #F3EFE6;
+    --ink-dim: #A8A08E;
+    --rule: #2E2B23;
+    --accent: #3E8563;
+    --accent-soft: #1E3427;
+    --accent-hover: #4E9F77;
+    --owe-you: #D45E30;
+    --owe-you-soft: #381D13;
+    --you-owe: #3E8563;
+    --you-owe-soft: #1E3427;
+    --neutral-settled: #8E8675;
+    --danger: #C04335;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Tabular figures for money numbers */
+.num-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom pulse keyframe for balance changes */
+@keyframes balancePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.pulse-balance {
+  animation: balancePulse 0.3s ease-out;
+}

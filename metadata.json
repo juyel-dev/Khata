@@ -1,0 +1,6 @@
+{
+  "name": "Khata — Simple Money Notebook",
+  "description": "A dead-simple, offline-first digital ledger for shopkeepers and individuals to track cash transactions, balances, and who owes what.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
