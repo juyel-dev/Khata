@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import {
   User,
   onAuthStateChanged,
@@ -14,17 +14,20 @@ import {
   ensureUserProfile,
   CloudSyncSummary,
 } from '@/lib/firebase/sync';
+import { subscribeToDatabase } from '@/lib/db/operations';
 
 interface FirebaseAuthContextType {
   user: User | null;
   loading: boolean;
   isSyncing: boolean;
+  isOnline: boolean;
   lastSyncedAt: number | null;
   error: string | null;
   signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
   syncLocalToCloud: () => Promise<CloudSyncSummary | null>;
   syncCloudToLocal: (mode?: 'merge' | 'replace') => Promise<CloudSyncSummary | null>;
+  syncAll: () => Promise<CloudSyncSummary | null>;
   clearError: () => void;
 }
 
@@ -34,6 +37,9 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  });
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('khata_last_cloud_sync');
@@ -42,53 +48,34 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     return null;
   });
   const [error, setError] = useState<string | null>(null);
+  const userRef = useRef<User | null>(null);
 
   useEffect(() => {
-    // Validate connection to Firestore on initial boot
-    testConnection().catch((e) => console.warn('Firebase connection test: ', e));
-
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-      if (currentUser) {
-        try {
-          await ensureUserProfile(currentUser);
-        } catch (err) {
-          console.error('Failed to sync profile: ', err);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+    userRef.current = user;
+  }, [user]);
 
   const clearError = useCallback(() => setError(null), []);
 
-  const signInWithGoogle = useCallback(async () => {
+  // Bi-directional full sync (push local first, then merge cloud updates)
+  const syncAll = useCallback(async (): Promise<CloudSyncSummary | null> => {
+    const activeUser = userRef.current;
+    if (!activeUser) return null;
     try {
+      setIsSyncing(true);
       setError(null);
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
-        await ensureUserProfile(result.user);
-      }
+      // 1. Push local changes to cloud
+      const backupSummary = await backupLocalToCloud(activeUser);
+      // 2. Pull & merge cloud updates into local Dexie
+      await restoreCloudToLocal(activeUser, 'merge');
+      setLastSyncedAt(backupSummary.syncedAt);
+      return backupSummary;
     } catch (err: unknown) {
-      console.error('Google sign-in error:', err);
-      const msg = err instanceof Error ? err.message : 'Sign in failed';
+      console.error('Full sync error:', err);
+      const msg = err instanceof Error ? err.message : 'Sync failed';
       setError(msg);
       throw err;
-    }
-  }, []);
-
-  const signOutUser = useCallback(async () => {
-    try {
-      setError(null);
-      await signOut(auth);
-      setUser(null);
-    } catch (err: unknown) {
-      console.error('Sign-out error:', err);
-      const msg = err instanceof Error ? err.message : 'Sign out failed';
-      setError(msg);
-      throw err;
+    } finally {
+      setIsSyncing(false);
     }
   }, []);
 
@@ -137,18 +124,146 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     [user]
   );
 
+  const signInWithGoogle = useCallback(async () => {
+    try {
+      setError(null);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        await ensureUserProfile(result.user);
+        // Automatic sync immediately upon signing in!
+        try {
+          setIsSyncing(true);
+          const backupSummary = await backupLocalToCloud(result.user);
+          await restoreCloudToLocal(result.user, 'merge');
+          setLastSyncedAt(backupSummary.syncedAt);
+        } catch (syncErr) {
+          console.warn('Initial post-login auto-sync warning:', syncErr);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+    } catch (err: unknown) {
+      console.error('Google sign-in error:', err);
+      const msg = err instanceof Error ? err.message : 'Sign in failed';
+      setError(msg);
+      throw err;
+    }
+  }, []);
+
+  const signOutUser = useCallback(async () => {
+    try {
+      setError(null);
+      await signOut(auth);
+      setUser(null);
+    } catch (err: unknown) {
+      console.error('Sign-out error:', err);
+      const msg = err instanceof Error ? err.message : 'Sign out failed';
+      setError(msg);
+      throw err;
+    }
+  }, []);
+
+  // 1. Initial auth state listener + test connection
+  useEffect(() => {
+    testConnection().catch((e) => console.warn('Firebase connection test: ', e));
+
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+      if (currentUser) {
+        try {
+          await ensureUserProfile(currentUser);
+          // Auto-sync on page refresh/session restore if online
+          if (navigator.onLine) {
+            await backupLocalToCloud(currentUser);
+            await restoreCloudToLocal(currentUser, 'merge');
+            setLastSyncedAt(Date.now());
+          }
+        } catch (err) {
+          console.error('Auto-sync on auth change warning:', err);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Connectivity listener: When reconnecting to internet, auto-sync if logged in
+  useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnline(true);
+      const currentUser = userRef.current;
+      if (currentUser) {
+        try {
+          setIsSyncing(true);
+          const summary = await backupLocalToCloud(currentUser);
+          await restoreCloudToLocal(currentUser, 'merge');
+          setLastSyncedAt(summary.syncedAt);
+        } catch (err) {
+          console.warn('Auto-sync on internet reconnect error:', err);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // 3. Auto-sync on local DB changes when logged in and online (debounced)
+  useEffect(() => {
+    if (!user) return;
+
+    let debounceTimer: NodeJS.Timeout | null = null;
+    const unsubscribe = subscribeToDatabase(() => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return; // Stored safely in local Dexie IndexedDB when offline
+      }
+
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        const currentUser = userRef.current;
+        if (currentUser && navigator.onLine) {
+          try {
+            await backupLocalToCloud(currentUser);
+            setLastSyncedAt(Date.now());
+          } catch (e) {
+            console.warn('Background auto-sync on DB change:', e);
+          }
+        }
+      }, 2500);
+    });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribe();
+    };
+  }, [user]);
+
   return (
     <FirebaseAuthContext.Provider
       value={{
         user,
         loading,
         isSyncing,
+        isOnline,
         lastSyncedAt,
         error,
         signInWithGoogle,
         signOutUser,
         syncLocalToCloud,
         syncCloudToLocal,
+        syncAll,
         clearError,
       }}
     >

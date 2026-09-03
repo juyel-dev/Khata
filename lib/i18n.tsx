@@ -131,6 +131,20 @@ export const translations = {
     cloudRestoreSuccess: 'Data restored from cloud successfully!',
     connectedToFirebase: 'Connected to Firebase Firestore',
     
+    // PWA & Offline
+    installApp: 'Install App',
+    installAppShort: 'Install',
+    installAppDesc: 'Install Khata on your phone or PC for full offline access and fast home screen launch.',
+    appInstalled: 'Installed',
+    installGuideTitle: 'Install Khata App',
+    installGuideIOSStep1: '1. Tap the Share button at the bottom of Safari',
+    installGuideIOSStep2: '2. Scroll down and tap "Add to Home Screen"',
+    installGuideAndroid: 'Tap "Install" below to add Khata to your home screen.',
+    installSuccess: 'Khata app installed successfully!',
+    offlineMode: 'Offline Mode (Saved to phone)',
+    onlineBack: 'Back Online (Synced to Cloud)',
+    autoSyncSuccess: 'Data automatically synced to cloud',
+    
     // About & Help
     aboutTitle: 'About Khata',
     aboutParagraph1: 'Khata is a dead-simple, offline-first digital ledger built for shopkeepers, small businesses, and individuals who want fast cash records without the complexity of modern accounting apps.',
@@ -272,6 +286,20 @@ export const translations = {
     cloudSyncSuccess: 'ক্লাউডে ডেটা সফলভাবে সংরক্ষিত হয়েছে!',
     cloudRestoreSuccess: 'ক্লাউড থেকে ডেটা সফলভাবে পুনরুদ্ধার হয়েছে!',
     connectedToFirebase: 'ফায়ারবেস ক্লাউড কানেক্টেড',
+    
+    // PWA & Offline
+    installApp: 'অ্যাপ ইনস্টল করুন',
+    installAppShort: 'ইনস্টল',
+    installAppDesc: 'ইন্টারনেট ছাড়াও সহজে হিসাব রাখতে ও দ্রুত ব্যবহার করতে খাতা অ্যাপ ইনস্টল করুন।',
+    appInstalled: 'ইনস্টল সম্পন্ন',
+    installGuideTitle: 'খাতা অ্যাপ ইনস্টল করুন',
+    installGuideIOSStep1: '১. সাফারির নিচে শেয়ার (Share) বাটনে ট্যাপ করুন',
+    installGuideIOSStep2: '২. নিচে গিয়ে "Add to Home Screen" অপশনে ট্যাপ করুন',
+    installGuideAndroid: 'খাতা অ্যাপটি হোম স্ক্রিনে ইনস্টল করতে নিচের "ইনস্টল" বাটনে চাপুন।',
+    installSuccess: 'খাতা অ্যাপ সফলভাবে ইনস্টল হয়েছে!',
+    offlineMode: 'অফলাইন মোড (ফোনে সেভ হচ্ছে)',
+    onlineBack: 'ইন্টারনেট চালু (ক্লাউডে সিঙ্ক সম্পন্ন)',
+    autoSyncSuccess: 'ক্লাউডে অটো-সিঙ্ক সফল হয়েছে',
     
     // About & Help
     aboutTitle: 'খাতা পরিচিতি',

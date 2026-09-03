@@ -6,6 +6,21 @@ export const metadata: Metadata = {
   title: 'Khata — Simple Money Notebook',
   description:
     'A dead-simple, offline-first digital ledger for shopkeepers and individuals to track cash transactions, balances, and who owes what.',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Khata',
+  },
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   openGraph: {
     title: 'Khata — Simple Money Notebook',
     description:

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 import { useFirebaseAuth } from '@/lib/context/FirebaseAuthContext';
 import { useI18n } from '@/lib/i18n';
+import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
 import {
   X,
   Languages,
@@ -199,6 +200,9 @@ export function HamburgerDrawer() {
                   </button>
                 </div>
               )}
+
+              {/* Optional in-drawer PWA Install Button (hidden once installed) */}
+              <PWAInstallButton variant="drawer" />
 
               {/* 1. Language Toggle */}
               <div className="px-3 py-2.5 rounded-xl bg-[var(--rule)]/30 flex items-center justify-between">

@@ -8,6 +8,7 @@ import { useFirebaseAuth } from '@/lib/context/FirebaseAuthContext';
 import { useI18n } from '@/lib/i18n';
 import { NotebookCard } from '@/components/notebook/NotebookCard';
 import { HomeBanner } from '@/components/nav/HomeBanner';
+import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
 import { Menu, Plus, BookOpen, BookCheck, Cloud, RefreshCw } from 'lucide-react';
 
 export default function HomePage() {
@@ -52,32 +53,36 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Cloud Sync Quick Action / Indicator */}
-        <button
-          id="home-cloud-sync-btn"
-          type="button"
-          onClick={handleQuickSync}
-          disabled={isSyncing}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[var(--rule)] bg-[var(--paper-card)] text-xs font-semibold text-[var(--ink)] hover:bg-[var(--rule)]/30 active:scale-95 transition-all shadow-2xs"
-          title={user ? 'Sync with Firebase Firestore' : 'Connect to Cloud'}
-        >
-          {isSyncing ? (
-            <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
-          ) : (
-            <Cloud
-              className={`w-3.5 h-3.5 ${
-                user ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--ink-dim)]'
-              }`}
-            />
-          )}
-          {user ? (
-            <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
-              {isSyncing ? 'Syncing' : 'Synced'}
-            </span>
-          ) : (
-            <span className="text-[11px] text-[var(--ink-dim)]">Sync</span>
-          )}
-        </button>
+        {/* Right side actions: PWA Install (until downloaded) + Cloud Sync */}
+        <div className="flex items-center gap-2">
+          <PWAInstallButton variant="header" />
+
+          <button
+            id="home-cloud-sync-btn"
+            type="button"
+            onClick={handleQuickSync}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[var(--rule)] bg-[var(--paper-card)] text-xs font-semibold text-[var(--ink)] hover:bg-[var(--rule)]/30 active:scale-95 transition-all shadow-2xs cursor-pointer"
+            title={user ? 'Sync with Firebase Firestore' : 'Connect to Cloud'}
+          >
+            {isSyncing ? (
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
+            ) : (
+              <Cloud
+                className={`w-3.5 h-3.5 ${
+                  user ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--ink-dim)]'
+                }`}
+              />
+            )}
+            {user ? (
+              <span className="text-[11px] text-emerald-700 dark:text-emerald-300 hidden xs:inline">
+                {isSyncing ? 'Syncing' : 'Synced'}
+              </span>
+            ) : (
+              <span className="text-[11px] text-[var(--ink-dim)] hidden xs:inline">Sync</span>
+            )}
+          </button>
+        </div>
       </header>
 
       {/* 2. Home Banner: Auto-swipe carousel */}

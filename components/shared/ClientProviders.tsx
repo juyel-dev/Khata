@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/nav/BottomNav';
 import { HamburgerDrawer } from '@/components/nav/HamburgerDrawer';
 import { TransactionSheet } from '@/components/transaction/TransactionSheet';
 import { UndoToast } from '@/components/shared/UndoToast';
+import { OfflineIndicator } from '@/components/pwa/OfflineIndicator';
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -17,6 +18,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
         <I18nProvider>
           <KhataUIProvider>
             <div className="min-h-screen flex flex-col bg-[var(--paper)] text-[var(--ink)]">
+              <OfflineIndicator />
               <main className="flex-1 pb-20">{children}</main>
               <BottomNav />
               <HamburgerDrawer />
