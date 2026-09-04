@@ -57,25 +57,6 @@ export async function getNotebooks(includeArchived = false): Promise<NotebookWit
   }
 }
 
-export async function ensureDefaultNotebook(): Promise<NotebookWithStats> {
-  const existing = await getNotebooks(false);
-  if (existing.length > 0) {
-    return existing[0];
-  }
-  const defaultNb = await createNotebook({
-    name: 'সাধারণ খাতা',
-    openingBalance: 0,
-    color: '#2F6B4F',
-    icon: 'book',
-  });
-  return {
-    ...defaultNb,
-    currentBalance: 0,
-    peopleCount: 0,
-    transactionCount: 0,
-  };
-}
-
 export async function getOverallSummary(): Promise<{
   totalToReceive: number;
   totalToPay: number;
@@ -406,6 +387,7 @@ export async function getOrCreatePerson(
     name: cleanName,
     phone: cleanPhone,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 
   await db.people.add(newPerson);
@@ -417,6 +399,7 @@ export async function updatePerson(id: string, name: string, phone?: string): Pr
   await db.people.update(id, {
     name: name.trim(),
     ...(phone !== undefined ? { phone: phone.trim() || undefined } : {}),
+    updatedAt: Date.now(),
   });
   notifyChange();
 }
@@ -507,6 +490,7 @@ export async function createTransaction(data: {
     note: data.note?.trim() || undefined,
     occurredAt: data.occurredAt || now,
     createdAt: now,
+    updatedAt: now,
   };
 
   await db.transaction('rw', db.transactions, db.notebooks, async () => {
@@ -528,6 +512,7 @@ export async function updateTransaction(
   const now = Date.now();
   const updates: Partial<Transaction> = {
     ...data,
+    updatedAt: Date.now(),
   };
   if (data.amount !== undefined) {
     updates.amount = Math.abs(Math.round(data.amount));
@@ -610,14 +595,23 @@ export async function importBackupData(
         await db.notebooks.clear();
       }
 
+      const now = Date.now();
       for (const nb of data.notebooks) {
-        await db.notebooks.put(nb);
+        await db.notebooks.put({ ...nb, updatedAt: nb.updatedAt || nb.createdAt || now });
       }
       for (const p of data.people) {
-        await db.people.put(p);
+        const person = p as Person & { updatedAt?: number };
+        await db.people.put({
+          ...person,
+          updatedAt: person.updatedAt || person.createdAt || now,
+        } as Person);
       }
       for (const t of data.transactions) {
-        await db.transactions.put(t);
+        const tr = t as Transaction & { updatedAt?: number };
+        await db.transactions.put({
+          ...tr,
+          updatedAt: tr.updatedAt || tr.createdAt || now,
+        } as Transaction);
       }
     });
 

@@ -13,7 +13,6 @@ import {
   getAllPeopleWithBalances,
   getPersonWithBalance,
   getTransactions,
-  ensureDefaultNotebook,
   subscribeToDatabase,
 } from '@/lib/db/operations';
 
@@ -26,12 +25,8 @@ export function useNotebooks(includeArchived = false) {
 
     const fetchNotebooks = async () => {
       try {
-        let data = await getNotebooks(includeArchived);
-        if (data.length === 0 && !includeArchived) {
-          // Automatically ensure the primary ledger notebook is initialized
-          const defNb = await ensureDefaultNotebook();
-          data = [defNb];
-        }
+        const data = await getNotebooks(includeArchived);
+        // খালি থাকলে খালিই — "প্রথম খাতা বানান" পথ দেখাবে, auto-খাতা নয়।
         if (isMounted) {
           setNotebooks(data);
           setLoading(false);

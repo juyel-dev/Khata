@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Khata Admin — Banner</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>খাতা Admin</h1>
+      <p class="sub">হোম ব্যানারের ছবি বসান (সর্বোচ্চ ৫টা)</p>
+    </header>
+
+    <section class="card" id="cfgCard">
+      <h2>1. Firebase সেটিং</h2>
+      <p class="hint">Vercel env / Firebase Console থেকে মান বসিয়ে Save চাপুন। শুধু এই ব্রাউজারে থাকবে।</p>
+      <label>API Key <input id="cfgApiKey" type="text" autocomplete="off" /></label>
+      <label>Auth Domain <input id="cfgAuthDomain" type="text" placeholder="khata-webapp.firebaseapp.com" autocomplete="off" /></label>
+      <label>Project ID <input id="cfgProjectId" type="text" placeholder="khata-webapp" autocomplete="off" /></label>
+      <button id="cfgSave">Save সেটিং</button>
+      <p class="status" id="cfgStatus"></p>
+    </section>
+
+    <section class="card" id="authCard">
+      <h2>2. লগইন (email + password)</h2>
+      <div id="loggedOut">
+        <label>Email <input id="email" type="email" autocomplete="email" /></label>
+        <label>Password <input id="password" type="password" autocomplete="current-password" /></label>
+        <button id="loginBtn">Login</button>
+        <p class="status" id="authStatus"></p>
+      </div>
+      <div id="loggedIn" class="hidden">
+        <p>লগইন আছে: <b id="who"></b></p>
+        <button id="logoutBtn" class="ghost">Logout</button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="bannerCard">
+      <h2>3. ব্যানার তালিকা</h2>
+      <p class="hint">নিয়ম: admin ছবি আগে, বাকি জায়গায় tips — মোট সর্বোচ্চ ৫ স্লাইড।</p>
+      <div id="bannerList"><p class="hint">লোড হচ্ছে…</p></div>
+
+      <h2 class="mt">নতুন ব্যানার</h2>
+      <label>ছবির লিংক (800×400) <input id="fImage" type="url" placeholder="https://…" /></label>
+      <label>চাপলে যাবে (ঐচ্ছিক) <input id="fLink" type="url" placeholder="https://…" /></label>
+      <label>শিরোনাম (ঐচ্ছিক) <input id="fTitle" type="text" maxlength="100" /></label>
+      <div class="row">
+        <label class="half">ক্রম <input id="fOrder" type="number" value="1" min="1" /></label>
+        <label class="half check"><input id="fActive" type="checkbox" checked /> চালু</label>
+      </div>
+      <button id="addBtn">যোগ করুন</button>
+      <p class="status" id="bannerStatus"></p>
+    </section>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>

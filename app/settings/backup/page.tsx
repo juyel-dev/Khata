@@ -24,8 +24,87 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-export default function BackupPage() {
-  const router = useRouter();
+function EmailSignInForm({
+  onSignIn,
+  onSignUp,
+}: {
+  onSignIn: (email: string, password: string) => Promise<void>;
+  onSignUp: (email: string, password: string) => Promise<void>;
+}) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'in' | 'up'>('in');
+  const [busy, setBusy] = useState(false);
+
+  const canGo = !busy && /.+@.+\..+/.test(email.trim()) && password.length >= 6;
+
+  const handleGo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canGo) return;
+    try {
+      setBusy(true);
+      if (mode === 'in') {
+        await onSignIn(email, password);
+      } else {
+        await onSignUp(email, password);
+      }
+    } catch {
+      // error FirebaseAuthContext-এ দেখায়
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleGo} className="space-y-2 pt-1">
+      <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ink-dim)]">
+        <button
+          type="button"
+          onClick={() => setMode('in')}
+          className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
+            mode === 'in' ? 'bg-[var(--ink)] text-[var(--paper)]' : ''
+          }`}
+        >
+          Sign in
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('up')}
+          className={`px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
+            mode === 'up' ? 'bg-[var(--ink)] text-[var(--paper)]' : ''
+          }`}
+        >
+          New account
+        </button>
+      </div>
+      <input
+        type="email"
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        className="w-full bg-[var(--paper)] border border-[var(--rule)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-dim)]/50 focus:outline-none focus:border-[var(--accent)] font-medium"
+      />
+      <input
+        type="password"
+        autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password (min 6)"
+        className="w-full bg-[var(--paper)] border border-[var(--rule)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--ink)] placeholder:text-[var(--ink-dim)]/50 focus:outline-none focus:border-[var(--accent)] font-medium"
+      />
+      <button
+        type="submit"
+        disabled={!canGo}
+        className="w-full py-2.5 px-4 rounded-xl bg-[var(--accent)] text-white text-xs font-bold shadow-xs hover:bg-[var(--accent-hover)] transition-all cursor-pointer disabled:opacity-50"
+      >
+        {mode === 'in' ? 'Sign in with Email' : 'Create account'}
+      </button>
+    </form>
+  );
+}
+
+export default function BackupPage() {  const router = useRouter();
   const { t, lang } = useI18n();
   const { showUndoToast } = useKhataUI();
   const {
@@ -35,6 +114,8 @@ export default function BackupPage() {
     lastSyncedAt,
     error: cloudError,
     signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
     signOutUser,
     syncLocalToCloud,
     syncCloudToLocal,
@@ -316,6 +397,10 @@ export default function BackupPage() {
                 </svg>
                 <span>{t('signInWithGoogle')}</span>
               </button>
+              <EmailSignInForm
+                onSignIn={signInWithEmail}
+                onSignUp={signUpWithEmail}
+              />
             </div>
           )}
         </div>

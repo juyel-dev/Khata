@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 import { useI18n } from '@/lib/i18n';
 import { useNotebooks, usePeople } from '@/hooks/useKhataDB';
@@ -500,8 +501,46 @@ function TransactionForm({ initialNotebookId, onClose }: TransactionFormProps) {
 export function TransactionSheet() {
   const { txSheet, closeTxSheet } = useKhataUI();
   const { notebooks } = useNotebooks();
+  const { t } = useI18n();
 
   if (!txSheet.isOpen) return null;
+
+  // খাতা না থাকলে ফর্ম নয় — "প্রথম খাতা বানান" পথ।
+  if (notebooks.length === 0 && !txSheet.transactionToEdit) {
+    return (
+      <div id="transaction-sheet-wrapper" className="fixed inset-0 z-50 overflow-hidden">
+        <motion.div
+          id="sheet-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={closeTxSheet}
+          className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+        />
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+          className="absolute bottom-0 left-0 right-0 max-w-lg mx-auto bg-[var(--paper)] rounded-t-3xl border-t border-[var(--rule)] shadow-2xl p-6 text-center z-10"
+        >
+          <h2 className="text-base font-bold text-[var(--ink)] mb-2">
+            {t('startFirstNotebook')}
+          </h2>
+          <p className="text-xs text-[var(--ink-dim)] mb-4 leading-relaxed">
+            {t('emptyNotebooksDesc')}
+          </p>
+          <Link
+            href="/notebook/new"
+            onClick={closeTxSheet}
+            className="inline-block px-6 py-3 rounded-full bg-[var(--accent)] text-white text-sm font-bold shadow-md"
+          >
+            + {t('newNotebook')}
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
 
   let targetNbId = txSheet.notebookId;
   if (!targetNbId || !notebooks.some((n) => n.id === targetNbId)) {

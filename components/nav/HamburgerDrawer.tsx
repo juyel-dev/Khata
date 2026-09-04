@@ -17,6 +17,7 @@ import {
   HelpCircle,
   BookOpen,
   Cloud,
+  CloudOff,
   LogOut,
   RefreshCw,
 } from 'lucide-react';
@@ -25,7 +26,7 @@ import { motion, AnimatePresence } from 'motion/react';
 export function HamburgerDrawer() {
   const { isDrawerOpen, closeDrawer, showUndoToast } = useKhataUI();
   const { lang, setLang, t } = useI18n();
-  const { user, isSyncing, signInWithGoogle, signOutUser, syncLocalToCloud } =
+  const { user, isSyncing, isOnline, signInWithGoogle, signOutUser, syncLocalToCloud } =
     useFirebaseAuth();
 
   const handleShare = async () => {
@@ -147,6 +148,8 @@ export function HamburgerDrawer() {
                     >
                       {isSyncing ? (
                         <RefreshCw className="w-3 h-3 animate-spin" />
+                      ) : !isOnline ? (
+                        <CloudOff className="w-3 h-3" />
                       ) : (
                         <Cloud className="w-3 h-3" />
                       )}

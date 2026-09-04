@@ -212,5 +212,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 5. অন্য সাইটের ফাইল: SW ধরবে না (ব্রাউজার নিজে সামলাবে)
+  // 5. Banner/ছবি (অন্য সাইটের হলেও): ক্যাশ আগে, না থাকলে এনে জমিয়ে রাখে।
+  // ছবি না এলে অ্যাপ tips ব্যানার দেখায় — কোনো error নয়।
+  if (
+    /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i.test(url.pathname)
+  ) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const fetchAndPut = fetch(request).then((response) => {
+          if (response && (response.status === 200 || response.type === 'opaque')) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, copy);
+            });
+          }
+          return response;
+        });
+        return cached || fetchAndPut;
+      })
+    );
+    return;
+  }
+
+  // 6. অন্য সাইটের বাকি ফাইল: SW ধরবে না (ব্রাউজার নিজে সামলাবে)
 });

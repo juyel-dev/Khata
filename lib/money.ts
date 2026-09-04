@@ -1,7 +1,7 @@
 /**
  * Money utilities for Khata
  * All monetary values are stored in integer paisa/poisha (1 unit = 100 poisha/paise) to eliminate floating point issues.
- * Supports Taka (৳), Rupee (₹), Dollar ($). Default is Taka (৳).
+ * Supports Taka (৳), Rupee (₹), Dollar ($). Default is Rupee (₹).
  */
 
 export type CurrencySymbol = '৳' | '₹' | '$';
@@ -11,7 +11,7 @@ export function getCurrencySymbol(): CurrencySymbol {
     const saved = localStorage.getItem('khata_currency') as CurrencySymbol;
     if (saved && (saved === '৳' || saved === '₹' || saved === '$')) return saved;
   }
-  return '৳';
+  return '₹';
 }
 
 export function setCurrencySymbol(symbol: CurrencySymbol): void {

@@ -5,6 +5,8 @@ import {
   User,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseConfigured } from '@/lib/firebase/config';
@@ -24,6 +26,8 @@ interface FirebaseAuthContextType {
   lastSyncedAt: number | null;
   error: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   syncLocalToCloud: () => Promise<CloudSyncSummary | null>;
   syncCloudToLocal: (mode?: 'merge' | 'replace') => Promise<CloudSyncSummary | null>;
@@ -156,8 +160,59 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  const signOutUser = useCallback(async () => {
-    if (!isFirebaseConfigured || !auth) {
+  const afterEmailAuth = useCallback(async (authedUser: User) => {
+    await ensureUserProfile(authedUser);
+    try {
+      setIsSyncing(true);
+      const backupSummary = await backupLocalToCloud(authedUser);
+      await restoreCloudToLocal(authedUser, 'merge');
+      setLastSyncedAt(backupSummary.syncedAt);
+    } catch (syncErr) {
+      console.warn('Initial post-login auto-sync warning:', syncErr);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  const signInWithEmail = useCallback(
+    async (email: string, password: string) => {
+      if (!isFirebaseConfigured || !auth) {
+        setError('Firebase সেট করা নেই। .env.local-এ Firebase মান বসান।');
+        throw new Error('Firebase not configured');
+      }
+      try {
+        setError(null);
+        const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+        if (result.user) await afterEmailAuth(result.user);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Sign in failed';
+        setError(msg);
+        throw err;
+      }
+    },
+    [afterEmailAuth]
+  );
+
+  const signUpWithEmail = useCallback(
+    async (email: string, password: string) => {
+      if (!isFirebaseConfigured || !auth) {
+        setError('Firebase সেট করা নেই। .env.local-এ Firebase মান বসান।');
+        throw new Error('Firebase not configured');
+      }
+      try {
+        setError(null);
+        const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        if (result.user) await afterEmailAuth(result.user);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Sign up failed';
+        setError(msg);
+        throw err;
+      }
+    },
+    [afterEmailAuth]
+  );
+
+  const signOutUser = useCallback(async () => {    if (!isFirebaseConfigured || !auth) {
       setUser(null);
       return;
     }
@@ -243,6 +298,8 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         lastSyncedAt,
         error,
         signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
         signOutUser,
         syncLocalToCloud,
         syncCloudToLocal,

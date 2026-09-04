@@ -185,6 +185,8 @@ export const translations = {
     deletedToast: 'Deleted',
     restoredToast: 'Restored',
     linkCopied: 'Link copied to clipboard',
+    open: 'Open',
+    copyLink: 'Copy link',
   },
   bn: {
     appName: 'খাতা',
@@ -366,6 +368,8 @@ export const translations = {
     deletedToast: 'মুছে ফেলা হয়েছে',
     restoredToast: 'পুনরুদ্ধার করা হয়েছে',
     linkCopied: 'লিংক কপি করা হয়েছে',
+    open: 'খুলুন',
+    copyLink: 'লিংক কপি করুন',
   },
 } as const;
 

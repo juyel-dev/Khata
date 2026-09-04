@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFirebaseAuth } from '@/lib/context/FirebaseAuthContext';
 import { useI18n } from '@/lib/i18n';
-import { WifiOff, Wifi, CloudUpload } from 'lucide-react';
+import { Wifi, CloudUpload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function OfflineIndicator() {
@@ -44,19 +44,6 @@ export function OfflineIndicator() {
   return (
     <div className="pointer-events-none fixed top-3 left-0 right-0 z-50 flex justify-center px-4">
       <AnimatePresence>
-        {!isOnline && (
-          <motion.div
-            key="offline-banner"
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="pointer-events-auto flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500 text-white text-xs font-semibold shadow-lg backdrop-blur-xs"
-          >
-            <WifiOff className="w-3.5 h-3.5 animate-pulse" />
-            <span>{t('offlineMode')}</span>
-          </motion.div>
-        )}
-
         {isOnline && showReconnected && (
           <motion.div
             key="online-banner"

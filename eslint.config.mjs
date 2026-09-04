@@ -8,4 +8,7 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig([{
     extends: [...next],
+}, {
+    // Admin dashboard (docs/) — plain HTML/JS, Next lint-এর বাইরে।
+    ignores: ["docs/**"],
 }]);

@@ -57,17 +57,50 @@ export async function ensureUserProfile(user: User): Promise<void> {
   }
 }
 
+function lastPushKey(uid: string): string {
+  return `khata_last_push_${uid}`;
+}
+
+function getLastPush(uid: string): number {
+  try {
+    if (typeof window === 'undefined') return 0;
+    return parseInt(localStorage.getItem(lastPushKey(uid)) || '0', 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setLastPush(uid: string, at: number): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(lastPushKey(uid), String(at));
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * Backs up all local Dexie records into Firestore under /users/{userId}
+ * Backs up local Dexie records into Firestore under /users/{userId}.
+ * শুধু নতুন/বদলানো অংশ পাঠায় (delta) — পুরো ডাটা বারবার নয়।
  * createdAt সংরক্ষণ করা হয় — দ্বিতীয়বার ব্যাকআপে তারিখ বদলে যায় না।
  */
 export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> {
   assertCloud();
   await ensureUserProfile(user);
 
-  const notebooks = await dexieDb.notebooks.toArray();
-  const people = await dexieDb.people.toArray();
-  const transactions = await dexieDb.transactions.toArray();
+  const lastPush = getLastPush(user.uid);
+  const isChanged = (updatedAt?: number, createdAt?: number) =>
+    (updatedAt || createdAt || 0) > lastPush;
+
+  const notebooks = (await dexieDb.notebooks.toArray()).filter((nb) =>
+    isChanged(nb.updatedAt, nb.createdAt)
+  );
+  const people = (await dexieDb.people.toArray()).filter((p) =>
+    isChanged(p.updatedAt, p.createdAt)
+  );
+  const transactions = (await dexieDb.transactions.toArray()).filter((tx) =>
+    isChanged(tx.updatedAt, tx.createdAt)
+  );
 
   // 1. Sync Notebooks (createdAt সংরক্ষণ করে)
   for (const nb of notebooks) {
@@ -167,6 +200,7 @@ export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> 
   if (typeof window !== 'undefined') {
     localStorage.setItem('khata_last_cloud_sync', String(now));
   }
+  setLastPush(user.uid, now);
 
   return {
     notebooksCount: notebooks.length,
@@ -249,6 +283,7 @@ export async function restoreCloudToLocal(
       name: data.name || 'Unnamed Person',
       phone: data.phone || undefined,
       createdAt: createdMs,
+      updatedAt: createdMs,
     };
   });
 
@@ -268,6 +303,7 @@ export async function restoreCloudToLocal(
       note: data.note || undefined,
       occurredAt: Number(data.occurredAt) || createdMs,
       createdAt: createdMs,
+      updatedAt: createdMs,
     };
   });
 

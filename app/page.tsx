@@ -8,16 +8,18 @@ import { useKhataSummary } from '@/hooks/useKhataSummary';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 import { useFirebaseAuth } from '@/lib/context/FirebaseAuthContext';
 import { useI18n } from '@/lib/i18n';
-import { formatPaise, getCurrencySymbol, setCurrencySymbol, CurrencySymbol } from '@/lib/money';
+import { formatPaise } from '@/lib/money';
 import { NotebookCard } from '@/components/notebook/NotebookCard';
 import { TransactionRow } from '@/components/transaction/TransactionRow';
 import { AvatarCircle } from '@/components/shared/AvatarCircle';
 import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
+import { HomeBanners } from '@/components/home/HomeBanners';
 import {
   Menu,
   Plus,
   BookOpen,
   Cloud,
+  CloudOff,
   RefreshCw,
   ArrowUpRight,
   ArrowDownLeft,
@@ -38,13 +40,12 @@ export default function HomePage() {
   const { transactions, loading: txLoading } = useTransactions({ limit: 30 });
   const { summary, loading: summaryLoading } = useKhataSummary();
   const { openDrawer, openTxSheet, showUndoToast, activeNotebookId, setActiveNotebookId } = useKhataUI();
-  const { user, isSyncing, syncLocalToCloud } = useFirebaseAuth();
+  const { user, isSyncing, isOnline, syncLocalToCloud } = useFirebaseAuth();
   const { t, lang } = useI18n();
 
   const [activeTab, setActiveTab] = useState<'customers' | 'transactions' | 'notebooks'>('customers');
   const [customerFilter, setCustomerFilter] = useState<'all' | 'owes' | 'youOwe'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [currency, setCurrency] = useState<CurrencySymbol>(() => getCurrencySymbol());
 
   // Set default active notebook ID if not set
   const currentNotebookId = useMemo(() => {
@@ -65,11 +66,9 @@ export default function HomePage() {
     }
   };
 
-  const handleCycleCurrency = () => {
-    const next: CurrencySymbol = currency === '৳' ? '₹' : currency === '₹' ? '$' : '৳';
-    setCurrencySymbol(next);
-    setCurrency(next);
-  };
+  // Filter pills count (search-এর নিচের ফিল্টার)
+  const debtorsCount = useMemo(() => people.filter((p) => p.net > 0).length, [people]);
+  const creditorsCount = useMemo(() => people.filter((p) => p.net < 0).length, [people]);
 
   // Filtered customer list
   const filteredPeople = useMemo(() => {
@@ -88,10 +87,6 @@ export default function HomePage() {
       return true;
     });
   }, [people, customerFilter, searchQuery]);
-
-  // Debtors & Creditors count
-  const debtorsCount = useMemo(() => people.filter((p) => p.net > 0).length, [people]);
-  const creditorsCount = useMemo(() => people.filter((p) => p.net < 0).length, [people]);
 
   return (
     <div className="max-w-md mx-auto px-4 py-4 sm:py-6 pb-28">
@@ -123,21 +118,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Action badges: Currency switcher, PWA Install, Cloud Sync */}
+        {/* Action badges: PWA Install, Cloud Sync */}
         <div className="flex items-center gap-1.5">
-          {/* Currency Switcher */}
-          <button
-            type="button"
-            onClick={handleCycleCurrency}
-            title="মুদ্রা পরিবর্তন করুন / Change Currency"
-            className="h-8 px-2 rounded-lg border border-[var(--rule)] bg-[var(--paper-card)] text-xs font-bold text-[var(--ink)] hover:border-[var(--accent)] active:scale-95 transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
-          >
-            <span className="text-sm font-extrabold text-[var(--accent)]">{currency}</span>
-            <span className="text-[10px] text-[var(--ink-dim)] font-normal hidden xs:inline">
-              {currency === '৳' ? 'BDT' : currency === '₹' ? 'INR' : 'USD'}
-            </span>
-          </button>
-
           {/* PWA Install Button */}
           <PWAInstallButton variant="header" />
 
@@ -152,6 +134,8 @@ export default function HomePage() {
           >
             {isSyncing ? (
               <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
+            ) : !isOnline ? (
+              <CloudOff className="w-3.5 h-3.5 text-[var(--ink-dim)]" />
             ) : (
               <Cloud
                 className={`w-3.5 h-3.5 ${
@@ -170,48 +154,13 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* 2. Global Ledger Summary Cards */}
+      {/* 2. Home banner (tips + admin images) */}
+      <div className="mb-3">
+        <HomeBanners />
+      </div>
+
+      {/* 2b. Today's quick glance */}
       <section className="mb-4">
-        <div className="grid grid-cols-2 gap-2.5">
-          {/* Total to Receive (মোট পাবো) */}
-          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3.5 shadow-2xs">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
-                <ArrowDownLeft className="w-3.5 h-3.5" />
-                {t('totalToReceive')}
-              </span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 dark:text-emerald-200">
-                {debtorsCount}
-              </span>
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 num-tabular">
-              {formatPaise(summary.totalToReceive)}
-            </div>
-            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
-              {debtorsCount > 0 ? `${debtorsCount} জন বাকি রয়েছে` : 'কোনো বাকি নেই'}
-            </div>
-          </div>
-
-          {/* Total to Give (মোট দেবো) */}
-          <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3.5 shadow-2xs">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300 flex items-center gap-1">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                {t('totalToPay')}
-              </span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-800 dark:text-rose-200">
-                {creditorsCount}
-              </span>
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-rose-700 dark:text-rose-300 num-tabular">
-              {formatPaise(summary.totalToPay)}
-            </div>
-            <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-1 font-medium">
-              {creditorsCount > 0 ? `${creditorsCount} জনকে দিতে হবে` : 'কোনো দেনা নেই'}
-            </div>
-          </div>
-        </div>
-
         {/* Sub-bar: Today's Transactions Quick Glance */}
         <div className="mt-2 py-2 px-3 rounded-xl bg-[var(--paper-card)] border border-[var(--rule)] flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">

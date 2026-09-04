@@ -17,6 +17,7 @@ export interface Person {
   name: string;
   phone?: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface Transaction {
@@ -28,6 +29,7 @@ export interface Transaction {
   note?: string;
   occurredAt: number;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface PersonWithBalance extends Person {
@@ -56,6 +58,43 @@ export class KhataDatabase extends Dexie {
       people: 'id, notebookId, name, createdAt',
       transactions: 'id, notebookId, personId, occurredAt, type, createdAt',
     });
+    // v2: সিঙ্কের জন্য updatedAt + একবারের নকল-খাতা সাফাই।
+    // auto-খাতা বানানোর race-এ জমা খালি "সাধারণ খাতা" নকলগুলো মুছে যায়।
+    this.version(2)
+      .stores({
+        notebooks: 'id, archived, createdAt, updatedAt',
+        people: 'id, notebookId, name, createdAt, updatedAt',
+        transactions: 'id, notebookId, personId, occurredAt, type, createdAt, updatedAt',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('people')
+          .toCollection()
+          .modify((p: Person) => {
+            p.updatedAt = p.updatedAt || p.createdAt || Date.now();
+          });
+        await tx
+          .table('transactions')
+          .toCollection()
+          .modify((t: Transaction) => {
+            t.updatedAt = t.updatedAt || t.createdAt || Date.now();
+          });
+        const nbs = (await tx.table('notebooks').toArray()) as Notebook[];
+        const defaults = nbs
+          .filter((n) => (n.name || '').trim() === 'সাধারণ খাতা')
+          .sort((a, b) => a.createdAt - b.createdAt);
+        if (defaults.length > 1) {
+          const people = (await tx.table('people').toArray()) as Person[];
+          const txs = (await tx.table('transactions').toArray()) as Transaction[];
+          for (const d of defaults.slice(1)) {
+            const hasP = people.some((p) => p.notebookId === d.id);
+            const hasT = txs.some((t) => t.notebookId === d.id);
+            if (!hasP && !hasT) {
+              await tx.table('notebooks').delete(d.id);
+            }
+          }
+        }
+      });
   }
 }
 

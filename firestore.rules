@@ -143,5 +143,21 @@ service cloud.firestore {
         allow delete: if isOwner(userId) && isValidId(transactionId);
       }
     }
+
+    // Home banners (managed from the admin dashboard) - public read, signed-in write.
+    match /banners/{bannerId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(bannerId) &&
+        incoming().id == bannerId &&
+        incoming().imageUrl is string && incoming().imageUrl.size() > 0 && incoming().imageUrl.size() <= 2000 &&
+        (!('linkUrl' in incoming()) || (incoming().linkUrl is string && incoming().linkUrl.size() <= 2000)) &&
+        (!('title' in incoming()) || (incoming().title is string && incoming().title.size() <= 100)) &&
+        (!('order' in incoming()) || incoming().order is int) &&
+        (!('active' in incoming()) || incoming().active is bool);
+      allow update: if isSignedIn() && isValidId(bannerId) &&
+        incoming().id == existing().id &&
+        incoming().imageUrl is string && incoming().imageUrl.size() > 0 && incoming().imageUrl.size() <= 2000;
+      allow delete: if isSignedIn() && isValidId(bannerId);
+    }
   }
 }
