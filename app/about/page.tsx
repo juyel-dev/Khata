@@ -33,7 +33,7 @@ export default function AboutPage() {
       } catch (err) {}
     } else {
       navigator.clipboard.writeText(window.location.origin);
-      showUndoToast(t('linkCopied'), () => {});
+      showUndoToast(t('linkCopied'));
     }
   };
 

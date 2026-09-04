@@ -43,7 +43,7 @@ export function HamburgerDrawer() {
       }
     } else {
       navigator.clipboard.writeText(window.location.origin);
-      showUndoToast(t('linkCopied'), () => {});
+      showUndoToast(t('linkCopied'));
     }
   };
 
@@ -141,7 +141,7 @@ export function HamburgerDrawer() {
                       disabled={isSyncing}
                       onClick={async () => {
                         const res = await syncLocalToCloud();
-                        if (res) showUndoToast(t('cloudSyncSuccess'), () => {});
+                        if (res) showUndoToast(t('cloudSyncSuccess'));
                       }}
                       className="flex-1 py-1.5 px-2.5 rounded-lg bg-[var(--accent)] text-white text-xs font-bold shadow-xs hover:bg-[var(--accent-hover)] transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                     >

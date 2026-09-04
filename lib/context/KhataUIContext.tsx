@@ -14,7 +14,7 @@ export interface TransactionSheetConfig {
 export interface UndoToastConfig {
   id: string;
   message: string;
-  onUndo: () => void;
+  onUndo: (() => void) | null;
   timeoutId?: NodeJS.Timeout;
 }
 
@@ -29,7 +29,7 @@ interface KhataUIContextType {
   
   // Undo Toast
   undoToast: UndoToastConfig | null;
-  showUndoToast: (message: string, onUndo: () => void) => void;
+  showUndoToast: (message: string, onUndo?: () => void) => void;
   dismissUndoToast: () => void;
 
   // Hamburger menu drawer
@@ -79,7 +79,7 @@ export function KhataUIProvider({ children }: { children: React.ReactNode }) {
     setTxSheet((prev) => ({ ...prev, isOpen: false, transactionToEdit: null }));
   };
 
-  const showUndoToast = (message: string, onUndo: () => void) => {
+  const showUndoToast = (message: string, onUndo?: () => void) => {
     if (undoToast?.timeoutId) {
       clearTimeout(undoToast.timeoutId);
     }
@@ -92,11 +92,13 @@ export function KhataUIProvider({ children }: { children: React.ReactNode }) {
     setUndoToast({
       id: toastId,
       message,
-      onUndo: () => {
-        clearTimeout(timeout);
-        onUndo();
-        setUndoToast(null);
-      },
+      onUndo: onUndo
+        ? () => {
+            clearTimeout(timeout);
+            onUndo();
+            setUndoToast(null);
+          }
+        : null,
       timeoutId: timeout,
     });
   };

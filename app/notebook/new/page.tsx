@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createNotebook } from '@/lib/db/operations';
 import { NOTEBOOK_COLORS, NOTEBOOK_ICONS } from '@/lib/db/schema';
-import { rupeesToPaise } from '@/lib/money';
+import { rupeesToPaise, getCurrencySymbol } from '@/lib/money';
 import { useI18n } from '@/lib/i18n';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 import { IconHelper } from '@/components/shared/IconHelper';
@@ -39,7 +39,7 @@ export default function NewNotebookPage() {
       });
 
       setActiveNotebookId(nb.id);
-      showUndoToast(`${t('savedToast')} — ${nb.name}`, () => {});
+      showUndoToast(`${t('savedToast')} — ${nb.name}`);
       router.push(`/notebook/${nb.id}`);
     } catch (err) {
       console.error('Failed to create notebook:', err);
@@ -92,7 +92,7 @@ export default function NewNotebookPage() {
           </div>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-[var(--ink-dim)]">
-              ₹
+              {getCurrencySymbol()}
             </span>
             <input
               id="new-nb-opening-balance-input"

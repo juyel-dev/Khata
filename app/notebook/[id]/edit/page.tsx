@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useNotebook } from '@/hooks/useKhataDB';
 import { updateNotebook, archiveNotebook, deleteNotebookPermanently } from '@/lib/db/operations';
 import { NOTEBOOK_COLORS, NOTEBOOK_ICONS, NotebookWithStats } from '@/lib/db/schema';
-import { rupeesToPaise, paiseToRupees } from '@/lib/money';
+import { rupeesToPaise, paiseToRupees, getCurrencySymbol } from '@/lib/money';
 import { useI18n } from '@/lib/i18n';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 import { IconHelper } from '@/components/shared/IconHelper';
@@ -50,7 +50,7 @@ function EditNotebookForm({ notebook }: EditNotebookFormProps) {
         icon: selectedIcon,
       });
 
-      showUndoToast(`${t('updatedToast')} — ${name.trim()}`, () => {});
+      showUndoToast(`${t('updatedToast')} — ${name.trim()}`);
       router.push(`/notebook/${notebook.id}`);
     } catch (err) {
       console.error('Failed to update notebook:', err);
@@ -63,7 +63,7 @@ function EditNotebookForm({ notebook }: EditNotebookFormProps) {
     try {
       await archiveNotebook(notebook.id, true);
       setActiveNotebookId(null);
-      showUndoToast(`${t('archiveNotebook')}`, () => {});
+      showUndoToast(`${t('archiveNotebook')}`);
       router.push('/');
     } catch (err) {
       console.error('Failed to archive notebook:', err);
@@ -74,7 +74,7 @@ function EditNotebookForm({ notebook }: EditNotebookFormProps) {
     try {
       await deleteNotebookPermanently(notebook.id);
       setActiveNotebookId(null);
-      showUndoToast(`${t('deletedToast')}`, () => {});
+      showUndoToast(`${t('deletedToast')}`);
       router.push('/');
     } catch (err) {
       console.error('Failed to delete notebook:', err);
@@ -120,7 +120,7 @@ function EditNotebookForm({ notebook }: EditNotebookFormProps) {
           </label>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-[var(--ink-dim)]">
-              ₹
+              {getCurrencySymbol()}
             </span>
             <input
               id="edit-nb-opening-balance-input"

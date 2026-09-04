@@ -39,7 +39,7 @@ export default function SettingsPage() {
       } catch (err) {}
     } else {
       navigator.clipboard.writeText(window.location.origin);
-      showUndoToast(t('linkCopied'), () => {});
+      showUndoToast(t('linkCopied'));
     }
   };
 
@@ -244,7 +244,7 @@ export default function SettingsPage() {
         <div className="p-4 rounded-xl bg-[var(--accent-soft)]/50 border border-[var(--accent)]/20 flex items-center gap-3 text-xs text-[var(--ink)]">
           <ShieldCheck className="w-5 h-5 text-[var(--accent)] shrink-0" />
           <p className="leading-relaxed">
-            All data is saved locally on your device in IndexedDB. Nothing leaves your phone.
+            {t('aboutParagraph2')}
           </p>
         </div>
       </div>

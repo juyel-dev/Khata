@@ -1,17 +1,19 @@
-# Project Workflow & Deployment Target
+# Khata — কাজের নিয়ম
 
-## Deployment Target: Vercel via GitHub Sync
-- The primary deployment environment is **Vercel** (connected to the user's GitHub repository).
-- The user exports and synchronizes code from Google AI Studio directly to their GitHub repository via the AI Studio Settings menu ("Export to GitHub").
-- GitHub automatically triggers the Vercel CI/CD pipeline to build and deploy (`next build`).
+## চালানোর জায়গা: Vercel (GitHub থেকে)
+- মূল কোড GitHub-এ (`juyel-dev/Khata`)।
+- GitHub-এ push করলে Vercel নিজে `next build` করে চালু করে।
+- Firebase ছাড়াও অ্যাপ সম্পূর্ণ অফলাইনে চলবে। Firebase দিলে ক্লাউড সিঙ্ক চালু হবে।
 
-## Rules for Future Code Changes
-1. **100% Vercel Production Ready**:
-   - Every file change, package installation, and configuration MUST pass `next build` (`compile_applet`) with zero errors.
-   - Do NOT rely on AI Studio preview-specific quirks, mock layers, or iframe-only workarounds.
-   - Ensure clean standard Next.js 15 App Router architecture.
-2. **Environment & Secrets**:
-   - Any new environment variable must be optional or have safe fallbacks, and must be documented in `.env.example`.
-   - Firebase configuration supports both `firebase-applet-config.json` (bundled default) and `NEXT_PUBLIC_FIREBASE_*` environment variables in Vercel.
-3. **Lint & Build Verification**:
-   - Always run `lint_applet` and `compile_applet` after any code edits to ensure the Vercel build succeeds without breaking the user's automated deployments.
+## কোড বদলের নিয়ম
+1. **Vercel-এ চলতেই হবে:**
+   - প্রতিটা বদলের পর `npm run lint` আর `npm run build` ভুল ছাড়া পাস করতে হবে।
+   - পরিষ্কার Next.js 15 App Router কাঠামো রাখুন।
+2. **গোপন তথ্য:**
+   - repo-তে কোনো চাবি রাখা যাবে না। সব `NEXT_PUBLIC_*` মান `.env.local` / Vercel env থেকে আসবে।
+   - নতুন env যোগ করলে `.env.example`-তে লিখুন। Firebase না থাকলে অ্যাপ যেন ভেঙে না যায়।
+   - Firestore নিয়ম (`firestore.rules`) বদলালে `security_spec.md`-এর ১২টা হামলা আটকায় কিনা দেখুন।
+3. **ডাটা নিয়ম:**
+   - টাকা সবসময় পয়সায় (integer) রাখুন, ভগ্নাংশ নয়।
+   - Dexie schema বদলালে version বাড়ান, পুরনো ডাটা মুছবেন না।
+   - `createdAt` কখনো বদলাবেন না, `updatedAt` সার্ভার সময়ে বসান।

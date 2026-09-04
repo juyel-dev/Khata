@@ -61,7 +61,7 @@ export default function HomePage() {
     }
     const res = await syncLocalToCloud();
     if (res) {
-      showUndoToast(t('cloudSyncSuccess'), () => {});
+      showUndoToast(t('cloudSyncSuccess'));
     }
   };
 

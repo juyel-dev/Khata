@@ -75,7 +75,7 @@ export default function PersonDetailPage({
     try {
       await updatePerson(person.id, editedName.trim(), person.phone);
       setIsEditingName(false);
-      showUndoToast(t('updatedToast'), () => {});
+      showUndoToast(t('updatedToast'));
     } catch (err) {
       console.error('Failed to update person name:', err);
     }
@@ -86,7 +86,7 @@ export default function PersonDetailPage({
     try {
       await updatePerson(person.id, person.name, editedPhone.trim());
       setIsEditingPhone(false);
-      showUndoToast(t('updatedToast'), () => {});
+      showUndoToast(t('updatedToast'));
     } catch (err) {
       console.error('Failed to update person phone:', err);
     }
@@ -95,12 +95,12 @@ export default function PersonDetailPage({
   const handleDeletePerson = async () => {
     setIsMenuOpen(false);
     if (person.transactionCount > 0) {
-      showUndoToast(t('cannotDeletePersonHasTx'), () => {});
+      showUndoToast(t('cannotDeletePersonHasTx'));
       return;
     }
     const success = await deletePerson(person.id);
     if (success) {
-      showUndoToast(t('deletedToast'), () => {});
+      showUndoToast(t('deletedToast'));
       router.push(`/notebook/${notebookId}`);
     }
   };

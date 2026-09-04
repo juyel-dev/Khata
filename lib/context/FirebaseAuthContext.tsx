@@ -7,20 +7,20 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { auth, googleProvider, testConnection } from '@/lib/firebase/config';
+import { auth, googleProvider, isFirebaseConfigured } from '@/lib/firebase/config';
 import {
   backupLocalToCloud,
   restoreCloudToLocal,
   ensureUserProfile,
   CloudSyncSummary,
 } from '@/lib/firebase/sync';
-import { subscribeToDatabase } from '@/lib/db/operations';
 
 interface FirebaseAuthContextType {
   user: User | null;
   loading: boolean;
   isSyncing: boolean;
   isOnline: boolean;
+  isConfigured: boolean;
   lastSyncedAt: number | null;
   error: string | null;
   signInWithGoogle: () => Promise<void>;
@@ -35,7 +35,8 @@ const FirebaseAuthContext = createContext<FirebaseAuthContextType | null>(null);
 
 export function FirebaseAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Firebase সেট না থাকলে শুরু থেকেই loading false — effect-এ setState লাগবে না।
+  const [loading, setLoading] = useState(() => isFirebaseConfigured);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(() => {
     return typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -59,18 +60,15 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
   // Bi-directional full sync (push local first, then merge cloud updates)
   const syncAll = useCallback(async (): Promise<CloudSyncSummary | null> => {
     const activeUser = userRef.current;
-    if (!activeUser) return null;
+    if (!activeUser || !isFirebaseConfigured) return null;
     try {
       setIsSyncing(true);
       setError(null);
-      // 1. Push local changes to cloud
       const backupSummary = await backupLocalToCloud(activeUser);
-      // 2. Pull & merge cloud updates into local Dexie
       await restoreCloudToLocal(activeUser, 'merge');
       setLastSyncedAt(backupSummary.syncedAt);
       return backupSummary;
     } catch (err: unknown) {
-      console.error('Full sync error:', err);
       const msg = err instanceof Error ? err.message : 'Sync failed';
       setError(msg);
       throw err;
@@ -80,6 +78,10 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const syncLocalToCloud = useCallback(async (): Promise<CloudSyncSummary | null> => {
+    if (!isFirebaseConfigured) {
+      setError('Firebase সেট করা নেই। ক্লাউড সিঙ্ক বন্ধ আছে, হিসাব ফোনেই নিরাপদে আছে।');
+      return null;
+    }
     if (!user) {
       setError('Please sign in to sync with the cloud.');
       return null;
@@ -91,7 +93,6 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       setLastSyncedAt(summary.syncedAt);
       return summary;
     } catch (err: unknown) {
-      console.error('Sync to cloud error:', err);
       const msg = err instanceof Error ? err.message : 'Failed to sync to cloud';
       setError(msg);
       throw err;
@@ -102,6 +103,10 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
 
   const syncCloudToLocal = useCallback(
     async (mode: 'merge' | 'replace' = 'merge'): Promise<CloudSyncSummary | null> => {
+      if (!isFirebaseConfigured) {
+        setError('Firebase সেট করা নেই। ক্লাউড সিঙ্ক বন্ধ আছে।');
+        return null;
+      }
       if (!user) {
         setError('Please sign in to restore from cloud.');
         return null;
@@ -113,7 +118,6 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         setLastSyncedAt(summary.syncedAt);
         return summary;
       } catch (err: unknown) {
-        console.error('Restore from cloud error:', err);
         const msg = err instanceof Error ? err.message : 'Failed to restore from cloud';
         setError(msg);
         throw err;
@@ -125,12 +129,15 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
   );
 
   const signInWithGoogle = useCallback(async () => {
+    if (!isFirebaseConfigured || !auth) {
+      setError('Firebase সেট করা নেই। .env.local-এ Firebase মান বসান।');
+      throw new Error('Firebase not configured');
+    }
     try {
       setError(null);
       const result = await signInWithPopup(auth, googleProvider);
       if (result.user) {
         await ensureUserProfile(result.user);
-        // Automatic sync immediately upon signing in!
         try {
           setIsSyncing(true);
           const backupSummary = await backupLocalToCloud(result.user);
@@ -143,7 +150,6 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         }
       }
     } catch (err: unknown) {
-      console.error('Google sign-in error:', err);
       const msg = err instanceof Error ? err.message : 'Sign in failed';
       setError(msg);
       throw err;
@@ -151,21 +157,26 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const signOutUser = useCallback(async () => {
+    if (!isFirebaseConfigured || !auth) {
+      setUser(null);
+      return;
+    }
     try {
       setError(null);
       await signOut(auth);
       setUser(null);
     } catch (err: unknown) {
-      console.error('Sign-out error:', err);
       const msg = err instanceof Error ? err.message : 'Sign out failed';
       setError(msg);
       throw err;
     }
   }, []);
 
-  // 1. Initial auth state listener + test connection
+  // 1. Auth state — Firebase থাকলেই শুনবে। না থাকলে অ্যাপ অফলাইনে চলবে।
   useEffect(() => {
-    testConnection().catch((e) => console.warn('Firebase connection test: ', e));
+    if (!isFirebaseConfigured || !auth) {
+      return;
+    }
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -173,14 +184,13 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       if (currentUser) {
         try {
           await ensureUserProfile(currentUser);
-          // Auto-sync on page refresh/session restore if online
           if (navigator.onLine) {
             await backupLocalToCloud(currentUser);
             await restoreCloudToLocal(currentUser, 'merge');
             setLastSyncedAt(Date.now());
           }
         } catch (err) {
-          console.error('Auto-sync on auth change warning:', err);
+          console.warn('Auto-sync on auth change:', err);
         }
       }
     });
@@ -188,8 +198,10 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     return () => unsubscribe();
   }, []);
 
-  // 2. Connectivity listener: When reconnecting to internet, auto-sync if logged in
+  // 2. নেট ফিরলে একবার sync (প্রতিটা ছোট বদলে নয় — বিল বাঁচাতে)
   useEffect(() => {
+    if (!isFirebaseConfigured) return;
+
     const handleOnline = async () => {
       setIsOnline(true);
       const currentUser = userRef.current;
@@ -200,7 +212,7 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
           await restoreCloudToLocal(currentUser, 'merge');
           setLastSyncedAt(summary.syncedAt);
         } catch (err) {
-          console.warn('Auto-sync on internet reconnect error:', err);
+          console.warn('Auto-sync on reconnect:', err);
         } finally {
           setIsSyncing(false);
         }
@@ -220,36 +232,6 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  // 3. Auto-sync on local DB changes when logged in and online (debounced)
-  useEffect(() => {
-    if (!user) return;
-
-    let debounceTimer: NodeJS.Timeout | null = null;
-    const unsubscribe = subscribeToDatabase(() => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        return; // Stored safely in local Dexie IndexedDB when offline
-      }
-
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(async () => {
-        const currentUser = userRef.current;
-        if (currentUser && navigator.onLine) {
-          try {
-            await backupLocalToCloud(currentUser);
-            setLastSyncedAt(Date.now());
-          } catch (e) {
-            console.warn('Background auto-sync on DB change:', e);
-          }
-        }
-      }, 2500);
-    });
-
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      unsubscribe();
-    };
-  }, [user]);
-
   return (
     <FirebaseAuthContext.Provider
       value={{
@@ -257,6 +239,7 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         loading,
         isSyncing,
         isOnline,
+        isConfigured: isFirebaseConfigured,
         lastSyncedAt,
         error,
         signInWithGoogle,

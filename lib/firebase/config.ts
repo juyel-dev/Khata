@@ -1,36 +1,45 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import defaultConfig from '@/firebase-applet-config.json';
+import { getFirestore } from 'firebase/firestore';
 
-const activeConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || defaultConfig.apiKey,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || defaultConfig.authDomain,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || defaultConfig.projectId,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || defaultConfig.storageBucket,
-  messagingSenderId:
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || defaultConfig.messagingSenderId,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || defaultConfig.appId,
-  firestoreDatabaseId:
-    process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || defaultConfig.firestoreDatabaseId,
-};
+// Firebase সেটিং শুধু environment থেকে আসবে। repo-তে কোনো চাবি রাখা নেই।
+// Firebase ছাড়াও অ্যাপ সম্পূর্ণ অফলাইনে চলবে।
 
-const app = getApps().length > 0 ? getApp() : initializeApp(activeConfig);
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '';
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '';
 
-// CRITICAL: The app will break without passing the configured firestoreDatabaseId
-export const db = getFirestore(app, activeConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+export const firebaseConfig: FirebaseOptions | null =
+  apiKey && projectId
+    ? {
+        apiKey,
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || undefined,
+        projectId,
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || undefined,
+        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || undefined,
+        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || undefined,
+      }
+    : null;
+
+export const isFirebaseConfigured = firebaseConfig !== null;
+
+export const firestoreDatabaseId =
+  process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || '(default)';
+
+const app = firebaseConfig ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : null;
+
+// Firebase সেট করা না থাকলে db/auth null থাকবে। ব্যবহারের আগে isFirebaseConfigured দেখুন।
+export const db = app ? getFirestore(app, firestoreDatabaseId) : (null as unknown as ReturnType<typeof getFirestore>);
+export const auth = app ? getAuth(app) : (null as unknown as ReturnType<typeof getAuth>);
 export const googleProvider = new GoogleAuthProvider();
 
 export async function testConnection(): Promise<boolean> {
+  if (!isFirebaseConfigured || !db) return false;
   try {
+    const { doc, getDocFromServer } = await import('firebase/firestore');
     await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    }
-    // permission-denied is normal since /test/connection is blocked by default-deny rule
+  } catch {
+    // /test/connection default-deny নিয়মে block করা, তাই false আসা স্বাভাবিক।
     return false;
   }
 }

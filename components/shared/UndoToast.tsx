@@ -35,14 +35,16 @@ function ToastItem({ toast }: { toast: UndoToastConfig }) {
       className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-50 overflow-hidden rounded-xl shadow-lg bg-[var(--ink)] text-[var(--paper)] py-3 px-4 flex items-center justify-between gap-3 select-none"
     >
       <span className="text-sm font-medium truncate">{toast.message}</span>
-      <button
-        id="undo-toast-btn"
-        type="button"
-        onClick={toast.onUndo}
-        className="text-sm font-bold text-[#6EE7B7] hover:text-white underline underline-offset-2 shrink-0 py-1 px-2 cursor-pointer transition-colors"
-      >
-        {t('undo')}
-      </button>
+      {toast.onUndo && (
+        <button
+          id="undo-toast-btn"
+          type="button"
+          onClick={toast.onUndo}
+          className="text-sm font-bold text-[#6EE7B7] hover:text-white underline underline-offset-2 shrink-0 py-1 px-2 cursor-pointer transition-colors"
+        >
+          {t('undo')}
+        </button>
+      )}
 
       {/* 5-second progress indicator line */}
       <div

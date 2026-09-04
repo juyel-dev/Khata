@@ -57,7 +57,7 @@ export default function BackupPage() {
     try {
       const res = await syncLocalToCloud();
       if (res) {
-        showUndoToast(t('cloudSyncSuccess'), () => {});
+        showUndoToast(t('cloudSyncSuccess'));
       }
     } catch (err) {
       console.error(err);
@@ -68,7 +68,7 @@ export default function BackupPage() {
     try {
       const res = await syncCloudToLocal('merge');
       if (res) {
-        showUndoToast(t('cloudRestoreSuccess'), () => {});
+        showUndoToast(t('cloudRestoreSuccess'));
       }
     } catch (err) {
       console.error(err);
@@ -113,7 +113,7 @@ export default function BackupPage() {
         URL.revokeObjectURL(url);
       }
 
-      showUndoToast(t('exportSuccess'), () => {});
+      showUndoToast(t('exportSuccess'));
     } catch (err) {
       console.error('Failed to export backup:', err);
     } finally {
@@ -141,7 +141,7 @@ export default function BackupPage() {
       const result = await importBackupData(selectedFileContent, importMode);
 
       if (result.success) {
-        showUndoToast(t('importSuccess'), () => {});
+        showUndoToast(t('importSuccess'));
         setSelectedFileContent(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';

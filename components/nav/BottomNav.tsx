@@ -14,12 +14,14 @@ export function BottomNav() {
   const { openTxSheet, activeNotebookId } = useKhataUI();
   const { notebooks } = useNotebooks();
 
-  // Hide bottom nav on deeper drill-downs as per NAVIGATION.md:
-  // "Bottom nav is not shown inside the transaction entry sheet, person detail drill-down, or settings — those are stack-navigated"
+  // শুধু মূল পর্দায় নিচের মেনু দেখাবে — ভেতরের পেজ, সেটিংসে নয়।
   const isTopLevelScreen =
     pathname === '/' ||
     pathname === '/history' ||
-    pathname.startsWith('/notebook/') && !pathname.includes('/person/') && !pathname.includes('/edit') && pathname !== '/notebook/new';
+    (pathname.startsWith('/notebook/') &&
+      !pathname.includes('/person/') &&
+      !pathname.includes('/edit') &&
+      pathname !== '/notebook/new');
 
   if (!isTopLevelScreen) {
     return null;

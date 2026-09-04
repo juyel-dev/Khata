@@ -22,7 +22,7 @@ export default function ArchivedNotebooksPage() {
   const handleRestore = async (id: string, name: string) => {
     try {
       await archiveNotebook(id, false);
-      showUndoToast(`${t('unarchiveNotebook')} — ${name}`, () => {});
+      showUndoToast(`${t('unarchiveNotebook')} — ${name}`);
     } catch (err) {
       console.error('Failed to unarchive notebook:', err);
     }
@@ -32,7 +32,7 @@ export default function ArchivedNotebooksPage() {
     try {
       await deleteNotebookPermanently(id);
       setDeleteConfirmId(null);
-      showUndoToast(t('deletedToast'), () => {});
+      showUndoToast(t('deletedToast'));
     } catch (err) {
       console.error('Failed to permanently delete notebook:', err);
     }

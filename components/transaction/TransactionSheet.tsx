@@ -144,8 +144,7 @@ function TransactionForm({ initialNotebookId, onClose }: TransactionFormProps) {
         });
 
         showUndoToast(
-          `${t('updatedToast')} — ${formatPaise(amountPaise)} (${finalPersonName})`,
-          () => {}
+          `${t('updatedToast')} — ${formatPaise(amountPaise)} (${finalPersonName})`
         );
       } else {
         // Create mode
@@ -162,8 +161,7 @@ function TransactionForm({ initialNotebookId, onClose }: TransactionFormProps) {
         setActiveNotebookId(selectedNotebookId);
 
         showUndoToast(
-          `${t('savedToast')} — ${formatPaise(amountPaise)} (${finalPersonName})`,
-          () => {}
+          `${t('savedToast')} — ${formatPaise(amountPaise)} (${finalPersonName})`
         );
       }
 
@@ -461,7 +459,7 @@ function TransactionForm({ initialNotebookId, onClose }: TransactionFormProps) {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={t('notePlaceholder')}
-            maxLength={80}
+            maxLength={500}
             className="w-full bg-[var(--paper-card)] border border-[var(--rule)] rounded-xl px-4 py-2.5 text-sm text-[var(--ink)] font-medium focus:outline-none focus:border-[var(--accent)] placeholder:text-[var(--ink-dim)]/50"
           />
         </div>
