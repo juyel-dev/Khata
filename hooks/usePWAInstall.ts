@@ -45,17 +45,8 @@ export function usePWAInstall() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
-    // 3. Register Service Worker in production/preview
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((reg) => {
-          console.log('Khata SW registered successfully:', reg.scope);
-        })
-        .catch((err) => {
-          console.warn('Khata SW registration notice:', err);
-        });
-    }
+    // Service Worker registration এখন <RegisterSW /> করে (সব পেজে একবার) —
+    // এখানে করলে হেডার+ড্রয়ার দুবার রেজিস্টার হতো।
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);

@@ -1,8 +1,19 @@
-// Khata PWA Service Worker
-const CACHE_NAME = 'khata-cache-v1';
+// Khata PWA Service Worker — full offline app shell
+// প্রথম ভিজিটে পুরো অ্যাপ (সব স্থির পেজ + স্ট্যাটিক ফাইল) ক্যাশে জমিয়ে রাখে,
+// যাতে পরে নেট না থাকলেও প্রতিটা পেজ খোলে। লেনদেনের তথ্য Dexie-তে (ফোনে) থাকে।
 
-const STATIC_ASSETS = [
+const CACHE_NAME = 'khata-cache-v2';
+
+// সব স্থির পেজ — প্রথমবারেই ডাউনলোড করে জমিয়ে রাখা হয়।
+// ডায়নামিক পেজ (/notebook/[id], /person/[id]) প্রথমবার দেখার পর আপনাআপনি জমে।
+const APP_SHELL = [
   '/',
+  '/history',
+  '/settings',
+  '/settings/backup',
+  '/settings/archived',
+  '/about',
+  '/notebook/new',
   '/icon.svg',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
@@ -14,12 +25,19 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(STATIC_ASSETS);
+      .then(async (cache) => {
+        // একটা ফাইল ফেল করলে যেন পুরো install বাতিল না হয়
+        await Promise.all(
+          APP_SHELL.map((url) =>
+            cache.add(url).catch((err) => {
+              console.warn('Khata SW precache skip:', url, err);
+            })
+          )
+        );
       })
       .then(() => self.skipWaiting())
       .catch((err) => {
-        console.warn('Khata SW install precache error:', err);
+        console.warn('Khata SW install error:', err);
       })
   );
 });
@@ -41,26 +59,43 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// পেজের ভেতরে ভেতরে যাওয়া (Next.js client navigation) শনাক্ত করা
+function isRSCRequest(request) {
+  return (
+    request.headers.has('rsc') ||
+    request.headers.has('next-router-state-tree') ||
+    request.headers.has('next-url')
+  );
+}
+
+function shouldBypass(url) {
+  return (
+    url.hostname.includes('firebaseio.com') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('gstatic.com') ||
+    url.hostname.includes('googleusercontent.com') ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('whatsapp.com') ||
+    url.hostname.includes('whatsapp.net') ||
+    url.pathname.startsWith('/api/')
+  );
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and chrome-extension or external protocols
+  // non-GET বা অন্য প্রোটোকল SW ধরবে না
   if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
     return;
   }
 
-  // Never cache Firebase, Google Auth, or API routes
-  if (
-    url.hostname.includes('firebaseio.com') ||
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('firestore.googleapis.com') ||
-    url.pathname.startsWith('/api/')
-  ) {
+  // ক্লাউড/গুগল/হোয়াটসঅ্যাপ — ক্যাশে হাত দেবে না
+  if (shouldBypass(url)) {
     return;
   }
 
-  // Handle navigation (HTML page load)
+  // 1. পেজ খোলা (HTML navigation): নেট আগে, না পেলে ক্যাশ, তাও না পেলে হোম
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -74,12 +109,10 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(async () => {
-          // Offline fallback
           const cachedPage = await caches.match(request);
           if (cachedPage) {
             return cachedPage;
           }
-          // Fallback to cached home page
           const rootFallback = await caches.match('/');
           if (rootFallback) {
             return rootFallback;
@@ -92,20 +125,46 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle Next.js static files and images (Cache-First / Stale-While-Revalidate)
+  // 2. Next.js ভেতরের পেজ বদল (RSC payload): নেট আগে, না পেলে ক্যাশ
+  if (isRSCRequest(request)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, copy);
+            });
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) {
+            return cached;
+          }
+          throw new Error('offline');
+        })
+    );
+    return;
+  }
+
+  // 3. Next.js স্ট্যাটিক ফাইল, ছবি, ফন্ট: ক্যাশ আগে, পেছনে নেট থেকে তাজা করে রাখে
   if (
-    url.pathname.startsWith('/_next/static/') ||
-    url.pathname.endsWith('.js') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.ico') ||
-    url.pathname.endsWith('.woff2')
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith('/_next/static/') ||
+      url.pathname.startsWith('/_next/image') ||
+      url.pathname.endsWith('.js') ||
+      url.pathname.endsWith('.css') ||
+      url.pathname.endsWith('.png') ||
+      url.pathname.endsWith('.jpg') ||
+      url.pathname.endsWith('.svg') ||
+      url.pathname.endsWith('.ico') ||
+      url.pathname.endsWith('.woff2'))
   ) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Return cached, and fetch fresh in background
           fetch(request)
             .then((freshResponse) => {
               if (freshResponse && freshResponse.status === 200) {
@@ -132,10 +191,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Default fetch
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      return cached || fetch(request);
-    })
-  );
+  // 4. বাকি same-origin GET: ক্যাশ আগে, না থাকলে নেট থেকে এনে জমিয়ে রাখে
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) {
+          return cached;
+        }
+        return fetch(request).then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, copy);
+            });
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // 5. অন্য সাইটের ফাইল: SW ধরবে না (ব্রাউজার নিজে সামলাবে)
 });
