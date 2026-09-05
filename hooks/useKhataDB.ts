@@ -1,18 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  NotebookWithStats,
-  PersonWithBalance,
-  Transaction,
-} from '@/lib/db/schema';
+import { NotebookWithStats, Transaction, IndividualSummary } from '@/lib/db/schema';
 import {
   getNotebooks,
   getNotebook,
-  getPeopleWithBalances,
-  getAllPeopleWithBalances,
-  getPersonWithBalance,
   getTransactions,
+  getIndividualSummaries,
   subscribeToDatabase,
 } from '@/lib/db/operations';
 
@@ -26,7 +20,6 @@ export function useNotebooks(includeArchived = false) {
     const fetchNotebooks = async () => {
       try {
         const data = await getNotebooks(includeArchived);
-        // খালি থাকলে খালিই — "প্রথম খাতা বানান" পথ দেখাবে, auto-খাতা নয়।
         if (isMounted) {
           setNotebooks(data);
           setLoading(false);
@@ -47,40 +40,6 @@ export function useNotebooks(includeArchived = false) {
   }, [includeArchived]);
 
   return { notebooks, loading };
-}
-
-export function useAllPeople() {
-  const [people, setPeople] = useState<
-    (PersonWithBalance & { notebookName?: string; notebookColor?: string })[]
-  >([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchAllPeople = async () => {
-      try {
-        const data = await getAllPeopleWithBalances();
-        if (isMounted) {
-          setPeople(data);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Failed to load all people:', err);
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchAllPeople();
-    const unsubscribe = subscribeToDatabase(fetchAllPeople);
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, []);
-
-  return { people, loading };
 }
 
 export function useNotebook(id: string | null) {
@@ -126,8 +85,8 @@ export function useNotebook(id: string | null) {
   return { notebook, loading };
 }
 
-export function usePeople(notebookId: string | null) {
-  const [people, setPeople] = useState<PersonWithBalance[]>([]);
+export function useIndividualSummaries(notebookId: string | null) {
+  const [individuals, setIndividuals] = useState<IndividualSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -136,29 +95,29 @@ export function usePeople(notebookId: string | null) {
     if (!notebookId) {
       Promise.resolve().then(() => {
         if (isMounted) {
-          setPeople([]);
+          setIndividuals([]);
           setLoading(false);
         }
       });
       return;
     }
 
-    const fetchPeople = () => {
-      getPeopleWithBalances(notebookId)
+    const fetchData = () => {
+      getIndividualSummaries(notebookId)
         .then((data) => {
           if (isMounted) {
-            setPeople(data);
+            setIndividuals(data);
             setLoading(false);
           }
         })
         .catch((err) => {
-          console.error('Failed to load people:', err);
+          console.error('Failed to load individual summaries:', err);
           if (isMounted) setLoading(false);
         });
     };
 
-    fetchPeople();
-    const unsubscribe = subscribeToDatabase(fetchPeople);
+    fetchData();
+    const unsubscribe = subscribeToDatabase(fetchData);
 
     return () => {
       isMounted = false;
@@ -166,67 +125,26 @@ export function usePeople(notebookId: string | null) {
     };
   }, [notebookId]);
 
-  return { people, loading };
-}
-
-export function usePerson(personId: string | null) {
-  const [person, setPerson] = useState<PersonWithBalance | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!personId) {
-      Promise.resolve().then(() => {
-        if (isMounted) {
-          setPerson(null);
-          setLoading(false);
-        }
-      });
-      return;
-    }
-
-    const fetchPerson = () => {
-      getPersonWithBalance(personId)
-        .then((data) => {
-          if (isMounted) {
-            setPerson(data);
-            setLoading(false);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to load person:', err);
-          if (isMounted) setLoading(false);
-        });
-    };
-
-    fetchPerson();
-    const unsubscribe = subscribeToDatabase(fetchPerson);
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, [personId]);
-
-  return { person, loading };
+  return { individuals, loading };
 }
 
 export function useTransactions(options?: {
   notebookId?: string;
-  personId?: string;
+  personName?: string;
   type?: 'gave' | 'got';
   limit?: number;
+  includeDeleted?: boolean;
 }) {
   const [transactions, setTransactions] = useState<
-    (Transaction & { personName?: string; notebookName?: string; notebookColor?: string })[]
+    (Transaction & { notebookName?: string; notebookColor?: string })[]
   >([]);
   const [loading, setLoading] = useState(true);
 
   const nbId = options?.notebookId;
-  const pId = options?.personId;
+  const pName = options?.personName;
   const txType = options?.type;
   const limitVal = options?.limit;
+  const includeDeleted = options?.includeDeleted;
 
   useEffect(() => {
     let isMounted = true;
@@ -234,9 +152,10 @@ export function useTransactions(options?: {
     const fetchTxs = () => {
       getTransactions({
         notebookId: nbId,
-        personId: pId,
+        personName: pName,
         type: txType,
         limit: limitVal,
+        includeDeleted,
       })
         .then((data) => {
           if (isMounted) {
@@ -257,7 +176,7 @@ export function useTransactions(options?: {
       isMounted = false;
       unsubscribe();
     };
-  }, [nbId, pId, txType, limitVal]);
+  }, [nbId, pName, txType, limitVal, includeDeleted]);
 
   return { transactions, loading };
 }

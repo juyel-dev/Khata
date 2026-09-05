@@ -7,48 +7,42 @@ export interface Notebook {
   createdAt: number;
   updatedAt: number;
   archived: boolean;
+  pinned: boolean;
   color: string;
   icon: string;
-}
-
-export interface Person {
-  id: string;
-  notebookId: string;
-  name: string;
-  phone?: string;
-  createdAt: number;
-  updatedAt: number;
+  deletedAt?: number; // soft-delete: khata "recently deleted"-e jay, hard-delete na
 }
 
 export interface Transaction {
   id: string;
   notebookId: string;
-  personId: string;
-  type: 'gave' | 'got';
+  personName: string; // free-text name, no separate Person entity
+  type: 'gave' | 'got'; // gave = '-', got = '+'
   amount: number; // in integer paise
   note?: string;
   occurredAt: number;
   createdAt: number;
   updatedAt: number;
-}
-
-export interface PersonWithBalance extends Person {
-  totalGiven: number; // in paise
-  totalTaken: number; // in paise
-  net: number; // totalGiven - totalTaken
-  lastTransaction?: Transaction;
-  transactionCount: number;
+  deletedAt?: number; // soft-delete
 }
 
 export interface NotebookWithStats extends Notebook {
   currentBalance: number; // openingBalance + sum(got) - sum(gave)
-  peopleCount: number;
   transactionCount: number;
+}
+
+// Computed from transactions grouped by personName - no separate table
+export interface IndividualSummary {
+  name: string;
+  totalGiven: number; // paise, type === 'gave'
+  totalGot: number; // paise, type === 'got'
+  net: number; // totalGot - totalGiven
+  transactionCount: number;
+  lastTransaction?: Transaction;
 }
 
 export class KhataDatabase extends Dexie {
   notebooks!: Table<Notebook, string>;
-  people!: Table<Person, string>;
   transactions!: Table<Transaction, string>;
 
   constructor() {
@@ -58,8 +52,6 @@ export class KhataDatabase extends Dexie {
       people: 'id, notebookId, name, createdAt',
       transactions: 'id, notebookId, personId, occurredAt, type, createdAt',
     });
-    // v2: সিঙ্কের জন্য updatedAt + একবারের নকল-খাতা সাফাই।
-    // auto-খাতা বানানোর race-এ জমা খালি "সাধারণ খাতা" নকলগুলো মুছে যায়।
     this.version(2)
       .stores({
         notebooks: 'id, archived, createdAt, updatedAt',
@@ -70,22 +62,22 @@ export class KhataDatabase extends Dexie {
         await tx
           .table('people')
           .toCollection()
-          .modify((p: Person) => {
+          .modify((p: any) => {
             p.updatedAt = p.updatedAt || p.createdAt || Date.now();
           });
         await tx
           .table('transactions')
           .toCollection()
-          .modify((t: Transaction) => {
+          .modify((t: any) => {
             t.updatedAt = t.updatedAt || t.createdAt || Date.now();
           });
-        const nbs = (await tx.table('notebooks').toArray()) as Notebook[];
+        const nbs = (await tx.table('notebooks').toArray()) as any[];
         const defaults = nbs
           .filter((n) => (n.name || '').trim() === 'সাধারণ খাতা')
           .sort((a, b) => a.createdAt - b.createdAt);
         if (defaults.length > 1) {
-          const people = (await tx.table('people').toArray()) as Person[];
-          const txs = (await tx.table('transactions').toArray()) as Transaction[];
+          const people = (await tx.table('people').toArray()) as any[];
+          const txs = (await tx.table('transactions').toArray()) as any[];
           for (const d of defaults.slice(1)) {
             const hasP = people.some((p) => p.notebookId === d.id);
             const hasT = txs.some((t) => t.notebookId === d.id);
@@ -94,6 +86,38 @@ export class KhataDatabase extends Dexie {
             }
           }
         }
+      });
+
+    // v3: lending/Person system removed - surgical simple ledger.
+    // personId -> personName (migrated by name lookup, no data loss).
+    // Notebook gets pinned + deletedAt, Transaction gets deletedAt. `people` table dropped.
+    this.version(3)
+      .stores({
+        notebooks: 'id, archived, pinned, createdAt, updatedAt, deletedAt',
+        people: null,
+        transactions: 'id, notebookId, occurredAt, type, createdAt, updatedAt, deletedAt',
+      })
+      .upgrade(async (tx) => {
+        const people = (await tx.table('people').toArray()) as any[];
+        const peopleMap = new Map<string, string>();
+        people.forEach((p) => peopleMap.set(p.id, p.name));
+
+        await tx
+          .table('transactions')
+          .toCollection()
+          .modify((t: any) => {
+            if (!t.personName) {
+              t.personName = peopleMap.get(t.personId) || 'Unknown';
+            }
+            delete t.personId;
+          });
+
+        await tx
+          .table('notebooks')
+          .toCollection()
+          .modify((n: any) => {
+            if (n.pinned === undefined) n.pinned = false;
+          });
       });
   }
 }

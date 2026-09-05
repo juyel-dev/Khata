@@ -8,6 +8,7 @@ interface BalanceHeaderProps {
   currentBalance: number;
   openingBalance: number;
   updatedAt: number;
+  createdAt?: number;
   notebookName?: string;
   color?: string;
 }
@@ -16,6 +17,7 @@ export function BalanceHeader({
   currentBalance,
   openingBalance,
   updatedAt,
+  createdAt,
   notebookName,
   color = '#2F6B4F',
 }: BalanceHeaderProps) {
@@ -69,6 +71,15 @@ export function BalanceHeader({
           {t('updated')}{' '}
           <span className="font-medium">{formatDateTime(updatedAt, lang)}</span>
         </span>
+        {createdAt !== undefined && (
+          <>
+            <span className="opacity-40">•</span>
+            <span>
+              {t('createdOn')}{' '}
+              <span className="font-medium">{formatDateTime(createdAt, lang)}</span>
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

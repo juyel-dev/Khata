@@ -6,7 +6,8 @@ import { NotebookWithStats } from '@/lib/db/schema';
 import { formatPaise } from '@/lib/money';
 import { useI18n } from '@/lib/i18n';
 import { IconHelper } from '@/components/shared/IconHelper';
-import { ChevronRight } from 'lucide-react';
+import { NotebookKebabMenu } from '@/components/notebook/NotebookKebabMenu';
+import { ChevronRight, Pin } from 'lucide-react';
 
 interface NotebookCardProps {
   notebook: NotebookWithStats;
@@ -27,10 +28,10 @@ export function NotebookCard({ notebook }: NotebookCardProps) {
     balanceColor = 'text-[var(--owe-you)]';
   }
 
-  const peopleText =
+  const txText =
     lang === 'bn'
-      ? `${notebook.peopleCount} জন ব্যক্তি`
-      : `${notebook.peopleCount} ${notebook.peopleCount === 1 ? 'person' : 'people'}`;
+      ? `${notebook.transactionCount} টি লেনদেন`
+      : `${notebook.transactionCount} ${notebook.transactionCount === 1 ? 'entry' : 'entries'}`;
 
   return (
     <Link
@@ -47,16 +48,17 @@ export function NotebookCard({ notebook }: NotebookCardProps) {
           <IconHelper name={notebook.icon || 'book'} className="w-6 h-6" />
         </div>
 
-        {/* Middle: Name + Person count */}
+        {/* Middle: Name + entry count */}
         <div className="flex-1 min-w-0 pr-2">
-          <h3 className="text-base font-semibold text-[var(--ink)] truncate group-hover:text-[var(--accent)] transition-colors">
-            {notebook.name}
+          <h3 className="text-base font-semibold text-[var(--ink)] truncate group-hover:text-[var(--accent)] transition-colors flex items-center gap-1.5">
+            {notebook.pinned && <Pin className="w-3.5 h-3.5 text-[var(--accent)] shrink-0 fill-current" />}
+            <span className="truncate">{notebook.name}</span>
           </h3>
-          <p className="text-xs text-[var(--ink-dim)] mt-0.5">{peopleText}</p>
+          <p className="text-xs text-[var(--ink-dim)] mt-0.5">{txText}</p>
         </div>
 
-        {/* Right: Current Balance */}
-        <div className="text-right shrink-0 flex items-center gap-1.5">
+        {/* Right: Current Balance + kebab */}
+        <div className="text-right shrink-0 flex items-center gap-1">
           <div>
             <div className={`text-base sm:text-lg font-bold num-tabular ${balanceColor}`}>
               {formatPaise(notebook.currentBalance)}
@@ -65,6 +67,7 @@ export function NotebookCard({ notebook }: NotebookCardProps) {
               {t('currentBalance')}
             </p>
           </div>
+          <NotebookKebabMenu notebook={notebook} />
           <ChevronRight className="w-4 h-4 text-[var(--ink-dim)]/60 group-hover:translate-x-0.5 transition-transform" />
         </div>
       </div>

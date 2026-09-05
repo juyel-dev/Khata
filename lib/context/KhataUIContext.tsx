@@ -6,9 +6,9 @@ import { Transaction } from '@/lib/db/schema';
 export interface TransactionSheetConfig {
   isOpen: boolean;
   notebookId?: string;
-  personId?: string;
+  personName?: string;
   type?: 'gave' | 'got';
-  transactionToEdit?: (Transaction & { personName?: string }) | null;
+  transactionToEdit?: Transaction | null;
 }
 
 export interface UndoToastConfig {
@@ -69,7 +69,7 @@ export function KhataUIProvider({ children }: { children: React.ReactNode }) {
     setTxSheet({
       isOpen: true,
       notebookId: config?.notebookId || activeNotebookId || undefined,
-      personId: config?.personId,
+      personName: config?.personName,
       type: config?.type || 'got',
       transactionToEdit: config?.transactionToEdit || null,
     });

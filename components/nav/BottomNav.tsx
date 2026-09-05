@@ -6,13 +6,11 @@ import { usePathname } from 'next/navigation';
 import { BookOpen, Plus, Clock } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
-import { useNotebooks } from '@/hooks/useKhataDB';
 
 export function BottomNav() {
   const pathname = usePathname();
   const { t } = useI18n();
-  const { openTxSheet, activeNotebookId } = useKhataUI();
-  const { notebooks } = useNotebooks();
+  const { openTxSheet } = useKhataUI();
 
   // শুধু মূল পর্দায় নিচের মেনু দেখাবে — ভেতরের পেজ, সেটিংসে নয়।
   const isTopLevelScreen =
@@ -30,24 +28,16 @@ export function BottomNav() {
   const isHome = pathname === '/' || pathname.startsWith('/notebook/');
   const isHistory = pathname === '/history';
 
+  // Home-e "+" = notun khata. Khata-r vitore "+" = oi khata-y transaction add.
+  const notebookMatch = pathname.match(/^\/notebook\/([^/]+)$/);
+  const insideNotebookId = notebookMatch ? notebookMatch[1] : null;
+
   const handleAddClick = () => {
-    // If no notebooks yet, can't add transaction directly
-    if (notebooks.length === 0) {
-      // route to /notebook/new or let openTxSheet handle it
-      window.location.href = '/notebook/new';
+    if (insideNotebookId) {
+      openTxSheet({ notebookId: insideNotebookId, type: 'got' });
       return;
     }
-
-    // Determine target notebook
-    let targetId = activeNotebookId;
-    if (!targetId || !notebooks.some((n) => n.id === targetId)) {
-      targetId = notebooks[0].id;
-    }
-
-    openTxSheet({
-      notebookId: targetId,
-      type: 'got',
-    });
+    window.location.href = '/notebook/new';
   };
 
   return (

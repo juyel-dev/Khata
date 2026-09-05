@@ -82,7 +82,7 @@ export default function ArchivedNotebooksPage() {
                       {nb.name}
                     </h3>
                     <p className="text-xs text-[var(--ink-dim)]">
-                      {formatPaise(nb.currentBalance)} • {nb.peopleCount} people
+                      {formatPaise(nb.currentBalance)} • {nb.transactionCount} entries
                     </p>
                   </div>
                 </div>

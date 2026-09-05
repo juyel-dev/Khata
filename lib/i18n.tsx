@@ -81,7 +81,28 @@ export const translations = {
     notePlaceholder: 'What was this for? (optional)',
     selectNotebookFirst: 'Select a notebook first',
     whichNotebook: 'Which notebook?',
-    
+
+    // Notebook kebab menu / khata list
+    rename: 'Rename',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    group: 'Group',
+    move: 'Move',
+
+    // Notebook detail tabs
+    individual: 'Individual',
+    entries: 'entries',
+    noTransactionsYet: 'No transactions yet. Tap + to add the first one.',
+    khata: 'Khata',
+    createdOn: 'Created',
+
+    // Recently Deleted
+    recentlyDeleted: 'Recently Deleted',
+    recentlyDeletedEmpty: 'Nothing in trash',
+    restore: 'Restore',
+    restored: 'Restored',
+    deleteForever: 'Delete forever',
+
     // Person Detail
     totalGiven: 'Total given',
     totalTaken: 'Total taken',
@@ -264,6 +285,27 @@ export const translations = {
     notePlaceholder: 'কি বাবদ ছিল? (ঐচ্ছিক)',
     selectNotebookFirst: 'প্রথমে একটি খাতা নির্বাচন করুন',
     whichNotebook: 'কোন খাতা?',
+
+    // Notebook kebab menu / khata list
+    rename: 'নাম পরিবর্তন',
+    pin: 'পিন করুন',
+    unpin: 'আনপিন করুন',
+    group: 'গ্রুপ',
+    move: 'সরান',
+
+    // Notebook detail tabs
+    individual: 'ব্যক্তিগত',
+    entries: 'টি এন্ট্রি',
+    noTransactionsYet: 'এখনো কোনো লেনদেন নেই। প্রথমটি যোগ করতে + চাপুন।',
+    khata: 'খাতা',
+    createdOn: 'তৈরি হয়েছে',
+
+    // Recently Deleted
+    recentlyDeleted: 'সম্প্রতি মুছে ফেলা',
+    recentlyDeletedEmpty: 'ট্র্যাশে কিছু নেই',
+    restore: 'পুনরুদ্ধার',
+    restored: 'পুনরুদ্ধার হয়েছে',
+    deleteForever: 'চিরতরে মুছুন',
     
     // Person Detail
     totalGiven: 'মোট দিয়েছেন',

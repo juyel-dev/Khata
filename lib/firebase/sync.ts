@@ -10,11 +10,10 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { handleFirestoreError, OperationType } from './errors';
-import { db as dexieDb, Notebook, Person, Transaction } from '@/lib/db/schema';
+import { db as dexieDb, Notebook, Transaction } from '@/lib/db/schema';
 
 export interface CloudSyncSummary {
   notebooksCount: number;
-  peopleCount: number;
   transactionsCount: number;
   syncedAt: number;
 }
@@ -95,9 +94,6 @@ export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> 
   const notebooks = (await dexieDb.notebooks.toArray()).filter((nb) =>
     isChanged(nb.updatedAt, nb.createdAt)
   );
-  const people = (await dexieDb.people.toArray()).filter((p) =>
-    isChanged(p.updatedAt, p.createdAt)
-  );
   const transactions = (await dexieDb.transactions.toArray()).filter((tx) =>
     isChanged(tx.updatedAt, tx.createdAt)
   );
@@ -119,6 +115,8 @@ export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> 
             color: nb.color || '#2F6B4F',
             icon: nb.icon || 'book',
             archived: Boolean(nb.archived),
+            pinned: Boolean(nb.pinned),
+            deletedAt: nb.deletedAt || null,
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -132,6 +130,8 @@ export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> 
           color: nb.color || '#2F6B4F',
           icon: nb.icon || 'book',
           archived: Boolean(nb.archived),
+          pinned: Boolean(nb.pinned),
+          deletedAt: nb.deletedAt || null,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -141,33 +141,7 @@ export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> 
     }
   }
 
-  // 2. Sync People (createdAt সংরক্ষণ করে)
-  for (const p of people) {
-    const path = `users/${user.uid}/people/${p.id}`;
-    try {
-      const pRef = doc(db, 'users', user.uid, 'people', p.id);
-      const existing = await getDoc(pRef);
-      const payload: Record<string, unknown> = {
-        id: p.id,
-        userId: user.uid,
-        notebookId: p.notebookId,
-        name: p.name,
-      };
-      if (p.phone && p.phone.trim().length > 0) {
-        payload.phone = p.phone.trim();
-      }
-      if (!existing.exists()) {
-        payload.createdAt = serverTimestamp();
-        await setDoc(pRef, payload);
-      } else {
-        await setDoc(pRef, payload, { merge: true });
-      }
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, path);
-    }
-  }
-
-  // 3. Sync Transactions (createdAt সংরক্ষণ করে)
+  // 2. Sync Transactions (createdAt সংরক্ষণ করে)
   for (const tx of transactions) {
     const path = `users/${user.uid}/transactions/${tx.id}`;
     try {
@@ -177,10 +151,11 @@ export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> 
         id: tx.id,
         userId: user.uid,
         notebookId: tx.notebookId,
-        personId: tx.personId,
+        personName: tx.personName,
         type: tx.type,
         amount: Math.round(tx.amount),
         occurredAt: Math.round(tx.occurredAt),
+        deletedAt: tx.deletedAt || null,
       };
       if (tx.note && tx.note.trim().length > 0) {
         payload.note = tx.note.trim();
@@ -204,7 +179,6 @@ export async function backupLocalToCloud(user: User): Promise<CloudSyncSummary> 
 
   return {
     notebooksCount: notebooks.length,
-    peopleCount: people.length,
     transactionsCount: transactions.length,
     syncedAt: now,
   };
@@ -219,11 +193,9 @@ export async function restoreCloudToLocal(
 ): Promise<CloudSyncSummary> {
   assertCloud();
   const notebooksCol = collection(db, 'users', user.uid, 'notebooks');
-  const peopleCol = collection(db, 'users', user.uid, 'people');
   const transactionsCol = collection(db, 'users', user.uid, 'transactions');
 
   let nbDocsArr: Awaited<ReturnType<typeof getDocs>>['docs'] = [];
-  let peopleDocsArr: Awaited<ReturnType<typeof getDocs>>['docs'] = [];
   let txDocsArr: Awaited<ReturnType<typeof getDocs>>['docs'] = [];
 
   try {
@@ -231,13 +203,6 @@ export async function restoreCloudToLocal(
     nbDocsArr = nbDocs.docs;
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, `users/${user.uid}/notebooks`);
-  }
-
-  try {
-    const peopleDocs = await getDocs(peopleCol);
-    peopleDocsArr = peopleDocs.docs;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, `users/${user.uid}/people`);
   }
 
   try {
@@ -265,25 +230,10 @@ export async function restoreCloudToLocal(
       createdAt: createdMs,
       updatedAt: updatedMs,
       archived: Boolean(data.archived),
+      pinned: Boolean(data.pinned),
+      deletedAt: data.deletedAt || undefined,
       color: data.color || '#2F6B4F',
       icon: data.icon || 'book',
-    };
-  });
-
-  const parsedPeople: Person[] = peopleDocsArr.map((docSnap) => {
-    const data = docSnap.data() as any;
-    const createdMs =
-      data.createdAt instanceof Timestamp
-        ? data.createdAt.toMillis()
-        : Date.now();
-
-    return {
-      id: data.id || docSnap.id,
-      notebookId: data.notebookId,
-      name: data.name || 'Unnamed Person',
-      phone: data.phone || undefined,
-      createdAt: createdMs,
-      updatedAt: createdMs,
     };
   });
 
@@ -297,39 +247,30 @@ export async function restoreCloudToLocal(
     return {
       id: data.id || docSnap.id,
       notebookId: data.notebookId,
-      personId: data.personId,
+      personName: data.personName || 'Unknown',
       type: data.type === 'got' ? 'got' : 'gave',
       amount: Number(data.amount) || 0,
       note: data.note || undefined,
       occurredAt: Number(data.occurredAt) || createdMs,
+      deletedAt: data.deletedAt || undefined,
       createdAt: createdMs,
       updatedAt: createdMs,
     };
   });
 
-  await dexieDb.transaction(
-    'rw',
-    dexieDb.notebooks,
-    dexieDb.people,
-    dexieDb.transactions,
-    async () => {
-      if (mode === 'replace') {
-        await dexieDb.transactions.clear();
-        await dexieDb.people.clear();
-        await dexieDb.notebooks.clear();
-      }
-
-      if (parsedNotebooks.length > 0) {
-        await dexieDb.notebooks.bulkPut(parsedNotebooks);
-      }
-      if (parsedPeople.length > 0) {
-        await dexieDb.people.bulkPut(parsedPeople);
-      }
-      if (parsedTransactions.length > 0) {
-        await dexieDb.transactions.bulkPut(parsedTransactions);
-      }
+  await dexieDb.transaction('rw', dexieDb.notebooks, dexieDb.transactions, async () => {
+    if (mode === 'replace') {
+      await dexieDb.transactions.clear();
+      await dexieDb.notebooks.clear();
     }
-  );
+
+    if (parsedNotebooks.length > 0) {
+      await dexieDb.notebooks.bulkPut(parsedNotebooks);
+    }
+    if (parsedTransactions.length > 0) {
+      await dexieDb.transactions.bulkPut(parsedTransactions);
+    }
+  });
 
   const now = Date.now();
   if (typeof window !== 'undefined') {
@@ -338,7 +279,6 @@ export async function restoreCloudToLocal(
 
   return {
     notebooksCount: parsedNotebooks.length,
-    peopleCount: parsedPeople.length,
     transactionsCount: parsedTransactions.length,
     syncedAt: now,
   };
