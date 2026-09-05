@@ -36,9 +36,11 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    // v3: lending/Person system removed. Notebook now carries pinned + deletedAt
+    // (deletedAt always present as either null or an epoch-ms int - soft-delete tombstone).
     function isValidNotebook(data, userId) {
-      return data.keys().hasAll(['id', 'userId', 'name', 'openingBalance', 'color', 'icon', 'archived', 'createdAt', 'updatedAt']) &&
-        data.keys().size() == 9 &&
+      return data.keys().hasAll(['id', 'userId', 'name', 'openingBalance', 'color', 'icon', 'archived', 'pinned', 'deletedAt', 'createdAt', 'updatedAt']) &&
+        data.keys().size() == 11 &&
         data.id is string && isValidId(data.id) &&
         data.userId == userId &&
         data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
@@ -46,31 +48,26 @@ service cloud.firestore {
         data.color is string && data.color.size() <= 30 &&
         data.icon is string && data.icon.size() <= 50 &&
         data.archived is bool &&
+        data.pinned is bool &&
+        (data.deletedAt == null || data.deletedAt is int) &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp;
     }
 
-    function isValidPerson(data, userId) {
-      return data.keys().hasAll(['id', 'userId', 'notebookId', 'name', 'createdAt']) &&
-        data.keys().size() >= 5 && data.keys().size() <= 6 &&
-        data.id is string && isValidId(data.id) &&
-        data.userId == userId &&
-        data.notebookId is string && isValidId(data.notebookId) &&
-        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-        (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
-        data.createdAt is timestamp;
-    }
-
+    // Transaction now carries a free-text personName (no separate Person entity) and
+    // a deletedAt tombstone (always present, null or epoch-ms int). No updatedAt field
+    // is synced for transactions in this schema version.
     function isValidTransaction(data, userId) {
-      return data.keys().hasAll(['id', 'userId', 'notebookId', 'personId', 'type', 'amount', 'occurredAt', 'createdAt']) &&
-        data.keys().size() >= 8 && data.keys().size() <= 9 &&
+      return data.keys().hasAll(['id', 'userId', 'notebookId', 'personName', 'type', 'amount', 'occurredAt', 'deletedAt', 'createdAt']) &&
+        (data.keys().size() == 9 || (data.keys().size() == 10 && 'note' in data)) &&
         data.id is string && isValidId(data.id) &&
         data.userId == userId &&
         data.notebookId is string && isValidId(data.notebookId) &&
-        data.personId is string && isValidId(data.personId) &&
+        data.personName is string && data.personName.size() > 0 && data.personName.size() <= 100 &&
         (data.type == 'gave' || data.type == 'got') &&
         data.amount is int && data.amount > 0 &&
         data.occurredAt is int &&
+        (data.deletedAt == null || data.deletedAt is int) &&
         (!('note' in data) || (data.note is string && data.note.size() <= 500)) &&
         data.createdAt is timestamp;
     }
@@ -105,25 +102,8 @@ service cloud.firestore {
           incoming().userId == existing().userId &&
           incoming().createdAt == existing().createdAt &&
           incoming().updatedAt == request.time &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'openingBalance', 'color', 'icon', 'archived', 'updatedAt']);
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'openingBalance', 'color', 'icon', 'archived', 'pinned', 'deletedAt', 'updatedAt']);
         allow delete: if isOwner(userId) && isValidId(notebookId);
-      }
-
-      // Subcollection: People
-      match /people/{personId} {
-        allow get: if isOwner(userId) && isValidId(personId);
-        allow list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidId(personId) &&
-          incoming().id == personId &&
-          isValidPerson(incoming(), userId) &&
-          incoming().createdAt == request.time;
-        allow update: if isOwner(userId) && isValidId(personId) &&
-          isValidPerson(incoming(), userId) &&
-          incoming().id == existing().id &&
-          incoming().userId == existing().userId &&
-          incoming().createdAt == existing().createdAt &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone']);
-        allow delete: if isOwner(userId) && isValidId(personId);
       }
 
       // Subcollection: Transactions
@@ -138,8 +118,9 @@ service cloud.firestore {
           isValidTransaction(incoming(), userId) &&
           incoming().id == existing().id &&
           incoming().userId == existing().userId &&
+          incoming().notebookId == existing().notebookId &&
           incoming().createdAt == existing().createdAt &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'note', 'occurredAt', 'personId', 'notebookId']);
+          incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'note', 'occurredAt', 'personName', 'deletedAt']);
         allow delete: if isOwner(userId) && isValidId(transactionId);
       }
     }
