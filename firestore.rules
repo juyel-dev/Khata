@@ -54,12 +54,12 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
-    // Transaction now carries a free-text personName (no separate Person entity) and
-    // a deletedAt tombstone (always present, null or epoch-ms int). No updatedAt field
-    // is synced for transactions in this schema version.
+    // Transaction now carries a free-text personName (no separate Person entity), a
+    // deletedAt tombstone (always present, null or epoch-ms int), and updatedAt (server
+    // time on every write) so delta-sync/conflict-resolution can order changes correctly.
     function isValidTransaction(data, userId) {
-      return data.keys().hasAll(['id', 'userId', 'notebookId', 'personName', 'type', 'amount', 'occurredAt', 'deletedAt', 'createdAt']) &&
-        (data.keys().size() == 9 || (data.keys().size() == 10 && 'note' in data)) &&
+      return data.keys().hasAll(['id', 'userId', 'notebookId', 'personName', 'type', 'amount', 'occurredAt', 'deletedAt', 'createdAt', 'updatedAt']) &&
+        (data.keys().size() == 10 || (data.keys().size() == 11 && 'note' in data)) &&
         data.id is string && isValidId(data.id) &&
         data.userId == userId &&
         data.notebookId is string && isValidId(data.notebookId) &&
@@ -69,7 +69,8 @@ service cloud.firestore {
         data.occurredAt is int &&
         (data.deletedAt == null || data.deletedAt is int) &&
         (!('note' in data) || (data.note is string && data.note.size() <= 500)) &&
-        data.createdAt is timestamp;
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
     }
 
     // User document
@@ -94,7 +95,6 @@ service cloud.firestore {
         allow create: if isOwner(userId) && isValidId(notebookId) &&
           incoming().id == notebookId &&
           isValidNotebook(incoming(), userId) &&
-          incoming().createdAt == request.time &&
           incoming().updatedAt == request.time;
         allow update: if isOwner(userId) && isValidId(notebookId) &&
           isValidNotebook(incoming(), userId) &&
@@ -113,14 +113,15 @@ service cloud.firestore {
         allow create: if isOwner(userId) && isValidId(transactionId) &&
           incoming().id == transactionId &&
           isValidTransaction(incoming(), userId) &&
-          incoming().createdAt == request.time;
+          incoming().updatedAt == request.time;
         allow update: if isOwner(userId) && isValidId(transactionId) &&
           isValidTransaction(incoming(), userId) &&
           incoming().id == existing().id &&
           incoming().userId == existing().userId &&
           incoming().notebookId == existing().notebookId &&
           incoming().createdAt == existing().createdAt &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'note', 'occurredAt', 'personName', 'deletedAt']);
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['type', 'amount', 'note', 'occurredAt', 'personName', 'deletedAt', 'updatedAt']);
         allow delete: if isOwner(userId) && isValidId(transactionId);
       }
     }

@@ -16,7 +16,8 @@
    - Document IDs: Max 128 chars, matching `^[a-zA-Z0-9_\-]+$`.
 5. **Timestamp & Mutation Immutability**:
    - `id`, `userId`, `createdAt` are immutable after creation. `notebookId` on a transaction is immutable after creation.
-   - `updatedAt` (notebooks) / `createdAt` (both) validated against server time `request.time`. Transactions in this schema version do not sync an `updatedAt` field to Firestore.
+   - `updatedAt` (both notebooks and transactions) must equal server time `request.time` on every write (create and update) — this is the field delta-sync/conflict-resolution orders by, so it can never be client-supplied.
+   - `createdAt` is client-supplied at creation (comparable to `occurredAt` — a record-keeping timestamp the client already fully controls, not a security-sensitive field) but is immutable after creation: any update must resend the exact same value stored on the existing document, or the write is rejected.
 
 ---
 
@@ -32,7 +33,7 @@
 8. **Unauthenticated Read/Write Breach**: Anonymous unauthenticated caller attempting `list` or `get` on `/users/{userId}/transactions`.
 9. **Orphan Transaction Injection**: Creating a transaction pointing to a nonexistent notebook ID (format-valid but no such document — same limitation as before: format is checked, cross-collection existence is not, to avoid extra read cost in rules; this only lets a user create a dangling reference inside their own path space, not access another user's data).
 10. **Immutable Field Mutator**: Modifying `createdAt`, `userId`, or (for transactions) `notebookId` in an existing notebook or transaction to rewrite history or move a transaction to a different ledger.
-11. **Client-Forced Timestamp Spoofing**: Supplying a backdated or future client timestamp instead of server timestamp `request.time`.
+11. **Client-Forced Timestamp Spoofing**: Supplying a backdated or future client timestamp for `updatedAt` instead of server timestamp `request.time` (still fully blocked). `createdAt` is intentionally client-supplied — see item 5 — and is not a spoofing vector since it carries no sync/ordering authority and only affects the user's own record-keeping of their own data.
 12. **PII Harvesting / Blanket Query Bypass**: Running a collection group query or unscoped collection query without `userId == request.auth.uid`.
 
 ---

@@ -13,9 +13,11 @@ import { auth, googleProvider, isFirebaseConfigured } from '@/lib/firebase/confi
 import {
   backupLocalToCloud,
   restoreCloudToLocal,
+  syncBidirectional,
   ensureUserProfile,
   CloudSyncSummary,
 } from '@/lib/firebase/sync';
+import { subscribeToDatabase } from '@/lib/db/operations';
 
 interface FirebaseAuthContextType {
   user: User | null;
@@ -61,17 +63,16 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
 
   const clearError = useCallback(() => setError(null), []);
 
-  // Bi-directional full sync (push local first, then merge cloud updates)
+  // Bi-directional full sync (pull+LWW-merge cloud changes first, then push local delta)
   const syncAll = useCallback(async (): Promise<CloudSyncSummary | null> => {
     const activeUser = userRef.current;
     if (!activeUser || !isFirebaseConfigured) return null;
     try {
       setIsSyncing(true);
       setError(null);
-      const backupSummary = await backupLocalToCloud(activeUser);
-      await restoreCloudToLocal(activeUser, 'merge');
-      setLastSyncedAt(backupSummary.syncedAt);
-      return backupSummary;
+      const summary = await syncBidirectional(activeUser);
+      setLastSyncedAt(summary.syncedAt);
+      return summary;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Sync failed';
       setError(msg);
@@ -144,9 +145,8 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         await ensureUserProfile(result.user);
         try {
           setIsSyncing(true);
-          const backupSummary = await backupLocalToCloud(result.user);
-          await restoreCloudToLocal(result.user, 'merge');
-          setLastSyncedAt(backupSummary.syncedAt);
+          const summary = await syncBidirectional(result.user);
+          setLastSyncedAt(summary.syncedAt);
         } catch (syncErr) {
           console.warn('Initial post-login auto-sync warning:', syncErr);
         } finally {
@@ -164,9 +164,8 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     await ensureUserProfile(authedUser);
     try {
       setIsSyncing(true);
-      const backupSummary = await backupLocalToCloud(authedUser);
-      await restoreCloudToLocal(authedUser, 'merge');
-      setLastSyncedAt(backupSummary.syncedAt);
+      const summary = await syncBidirectional(authedUser);
+      setLastSyncedAt(summary.syncedAt);
     } catch (syncErr) {
       console.warn('Initial post-login auto-sync warning:', syncErr);
     } finally {
@@ -240,9 +239,8 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         try {
           await ensureUserProfile(currentUser);
           if (navigator.onLine) {
-            await backupLocalToCloud(currentUser);
-            await restoreCloudToLocal(currentUser, 'merge');
-            setLastSyncedAt(Date.now());
+            const summary = await syncBidirectional(currentUser);
+            setLastSyncedAt(summary.syncedAt);
           }
         } catch (err) {
           console.warn('Auto-sync on auth change:', err);
@@ -263,8 +261,7 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       if (currentUser) {
         try {
           setIsSyncing(true);
-          const summary = await backupLocalToCloud(currentUser);
-          await restoreCloudToLocal(currentUser, 'merge');
+          const summary = await syncBidirectional(currentUser);
           setLastSyncedAt(summary.syncedAt);
         } catch (err) {
           console.warn('Auto-sync on reconnect:', err);
@@ -284,6 +281,38 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // 3. Active session-এ প্রতিটা local বদলের কিছুক্ষণ পর auto-sync (debounced) —
+  // আগে sync হতো শুধু login/reconnect-এ; একটানা online থেকে কাজ করলে কোনো
+  // ট্রিগার ছিল না। এখানে bidirectional (pull+push) ব্যবহার করা হয় যাতে অন্য
+  // ডিভাইসের পরিবর্তনও নিয়মিত মিলে যায়, শুধু নিজের এডিট push হয়ে থেমে না যায়।
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const unsubscribe = subscribeToDatabase(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        const currentUser = userRef.current;
+        if (!currentUser || !navigator.onLine) return;
+        try {
+          setIsSyncing(true);
+          const summary = await syncBidirectional(currentUser);
+          setLastSyncedAt(summary.syncedAt);
+        } catch (err) {
+          console.warn('Auto-sync (debounced) failed:', err);
+        } finally {
+          setIsSyncing(false);
+        }
+      }, 4000);
+    });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribe();
     };
   }, []);
 
