@@ -2,10 +2,11 @@
 // প্রথম ভিজিটে পুরো অ্যাপ (সব স্থির পেজ + স্ট্যাটিক ফাইল) ক্যাশে জমিয়ে রাখে,
 // যাতে পরে নেট না থাকলেও প্রতিটা পেজ খোলে। লেনদেনের তথ্য Dexie-তে (ফোনে) থাকে।
 
-const CACHE_NAME = 'khata-cache-v2';
+const CACHE_NAME = 'khata-cache-v3';
 
 // সব স্থির পেজ — প্রথমবারেই ডাউনলোড করে জমিয়ে রাখা হয়।
-// ডায়নামিক পেজ (/notebook/[id], /person/[id]) প্রথমবার দেখার পর আপনাআপনি জমে।
+// /notebook/view ও /notebook/edit এখন query-param route (?id=xxx) — path নিজে স্থির,
+// তাই যেকোনো khata id-র জন্যই (এমনকি অফলাইনে তৈরি নতুন khata-ও) precache কাজ করে।
 const APP_SHELL = [
   '/',
   '/history',
@@ -14,6 +15,8 @@ const APP_SHELL = [
   '/settings/archived',
   '/about',
   '/notebook/new',
+  '/notebook/view',
+  '/notebook/edit',
   '/icon.svg',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
@@ -95,56 +98,74 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1. পেজ খোলা (HTML navigation): নেট আগে, না পেলে ক্যাশ, তাও না পেলে হোম
+  // 1. পেজ খোলা (HTML navigation): cache আগে (তাৎক্ষণিক, অফলাইনেও), পেছনে network থেকে
+  // shell তাজা করে রাখে। ?id=xxx বাদ দিয়ে (ignoreSearch) মেলানো হয় যাতে
+  // /notebook/view?id=<যেকোনো-khata> একই precache-করা shell থেকে সাথে সাথে খোলে।
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, copy);
-            });
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cachedPage = await caches.match(request);
-          if (cachedPage) {
-            return cachedPage;
-          }
-          const rootFallback = await caches.match('/');
-          if (rootFallback) {
-            return rootFallback;
-          }
-          return new Response('You are offline. Khata will sync when you reconnect.', {
-            headers: { 'Content-Type': 'text/plain' },
-          });
-        })
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cachedPage = await cache.match(request, { ignoreSearch: true });
+
+        const networkFetch = fetch(request)
+          .then((response) => {
+            if (response && response.status === 200) {
+              cache.put(url.pathname, response.clone());
+            }
+            return response;
+          })
+          .catch(() => null);
+
+        if (cachedPage) {
+          // পেছনে freshen করে রাখি, কিন্তু ইউজারকে তাৎক্ষণিক cached shell দিয়ে দিই
+          networkFetch.catch(() => {});
+          return cachedPage;
+        }
+
+        const networkResponse = await networkFetch;
+        if (networkResponse) {
+          return networkResponse;
+        }
+
+        const rootFallback = await cache.match('/');
+        if (rootFallback) {
+          return rootFallback;
+        }
+        return new Response('You are offline. Khata will sync when you reconnect.', {
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      })()
     );
     return;
   }
 
-  // 2. Next.js ভেতরের পেজ বদল (RSC payload): নেট আগে, না পেলে ক্যাশ
+  // 2. Next.js ভেতরের পেজ বদল (RSC payload): cache আগে (ignoreSearch), পেছনে network freshen
   if (isRSCRequest(request)) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, copy);
-            });
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) {
-            return cached;
-          }
-          throw new Error('offline');
-        })
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(request, { ignoreSearch: true });
+
+        const networkFetch = fetch(request)
+          .then((response) => {
+            if (response && response.status === 200) {
+              cache.put(url.pathname, response.clone());
+            }
+            return response;
+          })
+          .catch(() => null);
+
+        if (cached) {
+          networkFetch.catch(() => {});
+          return cached;
+        }
+
+        const networkResponse = await networkFetch;
+        if (networkResponse) {
+          return networkResponse;
+        }
+        throw new Error('offline');
+      })()
     );
     return;
   }

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, use } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useNotebook, useTransactions } from '@/hooks/useKhataDB';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
@@ -12,14 +12,18 @@ import { IndividualTab } from '@/components/notebook/IndividualTab';
 import { TransactionRow } from '@/components/transaction/TransactionRow';
 import { ArrowLeft, History, Users } from 'lucide-react';
 
-export default function NotebookDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const notebookId = resolvedParams.id;
+// Query-param route (/notebook/view?id=xxx) instead of a dynamic segment
+// (/notebook/[id]) — khata id-গুলো runtime-এ Dexie-তে তৈরি হয় বলে static export-এ
+// dynamic segment কাজ করবে না, আর একটাই স্থির path হওয়ায় SW এটা precache করতে পারে
+// এবং অফলাইনে যেকোনো (এমনকি নতুন তৈরি হওয়া) khata-র জন্যও কাজ করে।
+function NotebookViewContent() {
+  const searchParams = useSearchParams();
+  const notebookId = searchParams.get('id') || '';
   const router = useRouter();
   const { t } = useI18n();
   const { openTxSheet, setActiveNotebookId } = useKhataUI();
 
-  const { notebook, loading: nbLoading } = useNotebook(notebookId);
+  const { notebook, loading: nbLoading } = useNotebook(notebookId || null);
   const { transactions, loading: txLoading } = useTransactions({ notebookId });
 
   const [tab, setTab] = useState<'transactions' | 'individual'>('transactions');
@@ -30,17 +34,7 @@ export default function NotebookDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [notebookId, setActiveNotebookId]);
 
-  if (nbLoading) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-8 space-y-4 animate-pulse">
-        <div className="h-8 bg-[var(--rule)]/40 rounded-lg w-1/2" />
-        <div className="h-36 bg-[var(--rule)]/40 rounded-2xl" />
-        <div className="h-60 bg-[var(--rule)]/40 rounded-xl" />
-      </div>
-    );
-  }
-
-  if (!notebook) {
+  if (!notebookId || (!nbLoading && !notebook)) {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center">
         <p className="text-base text-[var(--ink-dim)] mb-4">Notebook not found</p>
@@ -50,6 +44,16 @@ export default function NotebookDetailPage({ params }: { params: Promise<{ id: s
         >
           Return Home
         </Link>
+      </div>
+    );
+  }
+
+  if (nbLoading || !notebook) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-8 space-y-4 animate-pulse">
+        <div className="h-8 bg-[var(--rule)]/40 rounded-lg w-1/2" />
+        <div className="h-36 bg-[var(--rule)]/40 rounded-2xl" />
+        <div className="h-60 bg-[var(--rule)]/40 rounded-xl" />
       </div>
     );
   }
@@ -144,5 +148,13 @@ export default function NotebookDetailPage({ params }: { params: Promise<{ id: s
         <IndividualTab notebookId={notebook.id} />
       )}
     </div>
+  );
+}
+
+export default function NotebookViewPage() {
+  return (
+    <Suspense fallback={<div className="max-w-md mx-auto px-4 py-8 animate-pulse h-96" />}>
+      <NotebookViewContent />
+    </Suspense>
   );
 }

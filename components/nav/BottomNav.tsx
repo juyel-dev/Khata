@@ -1,36 +1,31 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { BookOpen, Plus, Clock } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 
-export function BottomNav() {
+function BottomNavContent() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
   const { openTxSheet } = useKhataUI();
 
   // শুধু মূল পর্দায় নিচের মেনু দেখাবে — ভেতরের পেজ, সেটিংসে নয়।
   const isTopLevelScreen =
-    pathname === '/' ||
-    pathname === '/history' ||
-    (pathname.startsWith('/notebook/') &&
-      !pathname.includes('/person/') &&
-      !pathname.includes('/edit') &&
-      pathname !== '/notebook/new');
+    pathname === '/' || pathname === '/history' || pathname === '/notebook/view';
 
   if (!isTopLevelScreen) {
     return null;
   }
 
-  const isHome = pathname === '/' || pathname.startsWith('/notebook/');
+  const isHome = pathname === '/' || pathname === '/notebook/view';
   const isHistory = pathname === '/history';
 
-  // Home-e "+" = notun khata. Khata-r vitore "+" = oi khata-y transaction add.
-  const notebookMatch = pathname.match(/^\/notebook\/([^/]+)$/);
-  const insideNotebookId = notebookMatch ? notebookMatch[1] : null;
+  // Home-e "+" = notun khata. Khata-r vitore (/notebook/view?id=xxx) "+" = oi khata-y transaction add.
+  const insideNotebookId = pathname === '/notebook/view' ? searchParams.get('id') : null;
 
   const handleAddClick = () => {
     if (insideNotebookId) {
@@ -85,5 +80,13 @@ export function BottomNav() {
         </Link>
       </div>
     </nav>
+  );
+}
+
+export function BottomNav() {
+  return (
+    <Suspense fallback={null}>
+      <BottomNavContent />
+    </Suspense>
   );
 }

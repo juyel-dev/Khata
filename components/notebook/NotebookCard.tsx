@@ -36,7 +36,7 @@ export function NotebookCard({ notebook }: NotebookCardProps) {
   return (
     <Link
       id={`notebook-card-${notebook.id}`}
-      href={`/notebook/${notebook.id}`}
+      href={`/notebook/view?id=${notebook.id}`}
       className="block w-full bg-[var(--paper-card)] border border-[var(--rule)] rounded-xl p-4 transition-all duration-150 hover:border-[var(--accent)]/40 active:bg-[var(--rule)]/20 shadow-2xs group"
     >
       <div className="flex items-center justify-between gap-3">

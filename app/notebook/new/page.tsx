@@ -40,7 +40,7 @@ export default function NewNotebookPage() {
 
       setActiveNotebookId(nb.id);
       showUndoToast(`${t('savedToast')} — ${nb.name}`);
-      router.push(`/notebook/${nb.id}`);
+      router.push(`/notebook/view?id=${nb.id}`);
     } catch (err) {
       console.error('Failed to create notebook:', err);
     } finally {

@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { NotebookWithStats } from '@/lib/db/schema';
 import { renameNotebook, pinNotebook, archiveNotebook, deleteNotebook, restoreNotebook } from '@/lib/db/operations';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 import { useI18n } from '@/lib/i18n';
-import { MoreVertical, Pencil, Pin, PinOff, Archive, ArchiveRestore, Trash2, FolderInput, ArrowRightLeft, X } from 'lucide-react';
+import { MoreVertical, Pencil, SlidersHorizontal, Pin, PinOff, Archive, ArchiveRestore, Trash2, FolderInput, ArrowRightLeft, X } from 'lucide-react';
 
 interface NotebookKebabMenuProps {
   notebook: NotebookWithStats;
@@ -17,6 +18,7 @@ export function NotebookKebabMenu({ notebook }: NotebookKebabMenuProps) {
   const [nameDraft, setNameDraft] = useState(notebook.name);
   const { showUndoToast } = useKhataUI();
   const { t } = useI18n();
+  const router = useRouter();
 
   const stop = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -83,6 +85,14 @@ export function NotebookKebabMenu({ notebook }: NotebookKebabMenuProps) {
               >
                 <Pencil className="w-4 h-4 text-[var(--ink-dim)]" />
                 {t('rename')}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { stop(e); setIsOpen(false); router.push(`/notebook/edit?id=${notebook.id}`); }}
+                className="w-full px-3.5 py-2 text-left text-sm font-medium text-[var(--ink)] hover:bg-[var(--rule)]/30 flex items-center gap-2.5"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-[var(--ink-dim)]" />
+                {t('editNotebook')}
               </button>
               <button
                 type="button"
