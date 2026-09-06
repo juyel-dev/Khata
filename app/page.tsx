@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useNotebooks } from '@/hooks/useKhataDB';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
 import { useFirebaseAuth } from '@/lib/context/FirebaseAuthContext';
@@ -9,9 +10,45 @@ import { useI18n } from '@/lib/i18n';
 import { NotebookCard } from '@/components/notebook/NotebookCard';
 import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
 import { HomeBanners } from '@/components/home/HomeBanners';
+import { LAST_ROUTE_KEY } from '@/components/shared/RouteTracker';
 import { Menu, Plus, BookOpen, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 
+const SESSION_ACTIVE_KEY = 'khata_session_active';
+
 export default function HomePage() {
+  const router = useRouter();
+
+  // App process kill হওয়ার পর (Android Recents থেকে আবার খোলা) manifest-এর
+  // start_url সবসময় '/'-এ নিয়ে আসে — এটা সেই কারণেই খালি হাতে শুরু হওয়া এড়িয়ে
+  // শেষ দেখা resumable screen-এ ফেরত পাঠায়। এটা true OS-level resume না —
+  // sessionStorage-এর মাধ্যমে "নতুন সেশন" শনাক্ত করা একটা workaround, তাই একটা
+  // সংক্ষিপ্ত blank মুহূর্ত/flash হতে পারে redirect হওয়ার আগে।
+  const [pendingRedirect] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const isFreshSession = !sessionStorage.getItem(SESSION_ACTIVE_KEY);
+      if (isFreshSession) {
+        const savedRoute = localStorage.getItem(LAST_ROUTE_KEY);
+        if (savedRoute && savedRoute !== '/') {
+          return savedRoute;
+        }
+      }
+    } catch {
+      // storage অনুপলব্ধ হলে (private mode) সাধারণ home-ই দেখাবে
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_ACTIVE_KEY, '1');
+    } catch {
+      // ignore
+    }
+    if (pendingRedirect) {
+      router.replace(pendingRedirect);
+    }
+  }, [pendingRedirect, router]);
   const { notebooks, loading: nbLoading } = useNotebooks();
   const { openDrawer, showUndoToast } = useKhataUI();
   const { user, isSyncing, isOnline, syncLocalToCloud } = useFirebaseAuth();
@@ -27,6 +64,10 @@ export default function HomePage() {
       showUndoToast(t('cloudSyncSuccess'));
     }
   };
+
+  if (pendingRedirect) {
+    return <div className="max-w-md mx-auto px-4 py-6" />;
+  }
 
   return (
     <div className="max-w-md mx-auto px-4 py-4 sm:py-6 pb-28">
