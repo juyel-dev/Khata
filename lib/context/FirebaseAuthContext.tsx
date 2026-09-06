@@ -8,6 +8,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  reauthenticateWithPopup,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseConfigured } from '@/lib/firebase/config';
 import {
@@ -17,6 +20,7 @@ import {
   ensureUserProfile,
   CloudSyncSummary,
 } from '@/lib/firebase/sync';
+import { deleteAccountCompletely } from '@/lib/firebase/account';
 import { subscribeToDatabase } from '@/lib/db/operations';
 
 interface FirebaseAuthContextType {
@@ -31,6 +35,7 @@ interface FirebaseAuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
+  deleteAccount: (password?: string) => Promise<void>;
   syncLocalToCloud: () => Promise<CloudSyncSummary | null>;
   syncCloudToLocal: (mode?: 'merge' | 'replace') => Promise<CloudSyncSummary | null>;
   syncAll: () => Promise<CloudSyncSummary | null>;
@@ -226,6 +231,44 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  // Google হলে popup দিয়ে, email/password হলে দেওয়া password দিয়ে reauthenticate
+  // করে - Firebase Auth-এর নিয়মে sensitive delete-এর আগে "recent login" লাগে।
+  // এরপর cloud data (batched) + profile doc + auth account + local Dexie সব মুছে দেয়।
+  const deleteAccount = useCallback(async (password?: string) => {
+    if (!isFirebaseConfigured || !auth) {
+      throw new Error('Firebase সেট করা নেই।');
+    }
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Please sign in first.');
+    }
+
+    try {
+      setError(null);
+      const providerId = currentUser.providerData[0]?.providerId;
+
+      if (providerId === 'google.com') {
+        await reauthenticateWithPopup(currentUser, googleProvider);
+      } else if (providerId === 'password') {
+        if (!password) {
+          throw new Error('Password is required to confirm account deletion.');
+        }
+        if (!currentUser.email) {
+          throw new Error('No email on this account.');
+        }
+        const credential = EmailAuthProvider.credential(currentUser.email, password);
+        await reauthenticateWithCredential(currentUser, credential);
+      }
+
+      await deleteAccountCompletely(currentUser);
+      setUser(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete account';
+      setError(msg);
+      throw err;
+    }
+  }, []);
+
   // 1. Auth state — Firebase থাকলেই শুনবে। না থাকলে অ্যাপ অফলাইনে চলবে।
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
@@ -330,6 +373,7 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         signInWithEmail,
         signUpWithEmail,
         signOutUser,
+        deleteAccount,
         syncLocalToCloud,
         syncCloudToLocal,
         syncAll,

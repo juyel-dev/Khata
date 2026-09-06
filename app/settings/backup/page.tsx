@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 import { useKhataUI } from '@/lib/context/KhataUIContext';
@@ -368,6 +369,14 @@ export default function BackupPage() {  const router = useRouter();
                   <span>{t('restoreFromCloud')}</span>
                 </button>
               </div>
+
+              <Link
+                id="settings-goto-delete-account"
+                href="/settings/delete-account"
+                className="block text-center py-2 text-[11px] font-semibold text-[var(--danger)]/80 hover:text-[var(--danger)] transition-colors"
+              >
+                {t('deleteAccount')}
+              </Link>
             </div>
           ) : (
             <div className="space-y-3 pt-1">

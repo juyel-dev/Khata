@@ -86,7 +86,8 @@ service cloud.firestore {
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time &&
         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'email']);
-      allow delete: if false;
+      allow delete: if isOwner(userId) &&
+        request.time.toMillis() / 1000 - request.auth.token.auth_time < 300;
 
       // Subcollection: Notebooks
       match /notebooks/{notebookId} {

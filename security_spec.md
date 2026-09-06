@@ -18,6 +18,7 @@
    - `id`, `userId`, `createdAt` are immutable after creation. `notebookId` on a transaction is immutable after creation.
    - `updatedAt` (both notebooks and transactions) must equal server time `request.time` on every write (create and update) — this is the field delta-sync/conflict-resolution orders by, so it can never be client-supplied.
    - `createdAt` is client-supplied at creation (comparable to `occurredAt` — a record-keeping timestamp the client already fully controls, not a security-sensitive field) but is immutable after creation: any update must resend the exact same value stored on the existing document, or the write is rejected.
+6. **Account Deletion Requires Fresh Authentication**: Deleting the `/users/{userId}` profile document (the final, irreversible step of self-service account deletion — see `lib/firebase/account.ts`) is only permitted when the caller authenticated within the last 5 minutes (`request.auth.token.auth_time`). This mirrors the Firebase Auth SDK's own "recent login" requirement for `deleteUser()`, so a stolen/stale session token cannot be used to trigger account deletion long after the legitimate user last actively signed in.
 
 ---
 
@@ -35,6 +36,7 @@
 10. **Immutable Field Mutator**: Modifying `createdAt`, `userId`, or (for transactions) `notebookId` in an existing notebook or transaction to rewrite history or move a transaction to a different ledger.
 11. **Client-Forced Timestamp Spoofing**: Supplying a backdated or future client timestamp for `updatedAt` instead of server timestamp `request.time` (still fully blocked). `createdAt` is intentionally client-supplied — see item 5 — and is not a spoofing vector since it carries no sync/ordering authority and only affects the user's own record-keeping of their own data.
 12. **PII Harvesting / Blanket Query Bypass**: Running a collection group query or unscoped collection query without `userId == request.auth.uid`.
+13. **Stale-Session Account Deletion**: Attempting to delete `/users/{userId}` using an old/long-lived auth token whose `auth_time` is more than 5 minutes in the past (must be rejected even though `isOwner(userId)` otherwise holds — see Data Invariant 6).
 
 ---
 
